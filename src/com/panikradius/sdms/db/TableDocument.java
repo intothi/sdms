@@ -1,12 +1,12 @@
-package db;
+package com.panikradius.sdms.db;
 
 public class TableDocument {
 
     public static final TableConnectionInfo tableConnectionInfo = new TableConnectionInfo(
-            DbConnection.DATABASE_NAME_DMS,
+            DbConnection.DATABASE_NAME,
             "document",
-            DbConnection.USER_DMS,
-            DbConnection.PW_DMS
+            DbConnection.USER,
+            DbConnection.PW
     );
 
     private static final String QUERY_CREATE =  "CREATE TABLE " + tableConnectionInfo.tableName + " ("

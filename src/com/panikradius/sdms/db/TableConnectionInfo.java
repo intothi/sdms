@@ -1,4 +1,4 @@
-package db;
+package com.panikradius.sdms.db;
 
 public class TableConnectionInfo {
 
