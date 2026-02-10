@@ -3,9 +3,15 @@ package com.panikradius.sdms;
 
 import com.panikradius.sdms.db.TableDocument;
 import com.panikradius.sdms.db.TableLog;
+import com.sun.net.httpserver.HttpServer;
+import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;
+import org.glassfish.jersey.server.ResourceConfig;
 
 import java.io.File;
+import java.net.URI;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.TimeZone;
 
 public class App {
@@ -17,6 +23,24 @@ public class App {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         dbTest();
         createEnvironment();
+
+        System.out.println("init backend");
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+        ResourceConfig rc = new ResourceConfig().packages("com.panikradius.panikHubBackend.routes");
+        rc.register(new CorsFilter());
+        rc.register(org.glassfish.jersey.jackson.JacksonFeature.class);
+        rc.register(org.glassfish.jersey.media.multipart.MultiPartFeature.class);
+
+        Map<String, Object> properties = new HashMap<String, Object>();
+        properties.put("jersey.config.server.wadl.disableWadl", "true");
+        rc.setProperties(properties);
+
+        // if we dont register JacksonFeature, Jackson wont work if we build the app
+        // for some reason though its no problem at all to run it in the debugger of intelij, even if its not registered
+
+        HttpServer server = JdkHttpServerFactory.createHttpServer(URI.create("http://localhost:8080/v1"), rc);
+        System.out.println("backend is listening ...");
+
     }
 
     private static void dbTest() {
