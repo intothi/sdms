@@ -95,7 +95,8 @@ public class DbHelper {
                     tableConnectionInfo.user,
                     tableConnectionInfo.pw);
 
-            String query = "SELECT count(*) FROM " + tableConnectionInfo.tableName + " WHERE " + whereStatement + " LIMIT 1;";
+            String query = "SELECT count(*) FROM " + tableConnectionInfo.tableName
+                    + " WHERE " + whereStatement + " LIMIT 1;";
 
             statement = connection.createStatement();
             resultSet = statement.executeQuery(query);
@@ -146,7 +147,8 @@ public class DbHelper {
         // TODO(CT) It makes no sense to me, to create an instance of product, in an general helper class
 
         try {
-            connection = DriverManager.getConnection(tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
+            connection = DriverManager.getConnection(
+                    tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
             statement = connection.createStatement();
             String query = "SELECT * FROM " + tableConnectionInfo.tableName + " WHERE id = " + id + " LIMIT 1";
             ResultSet resultSet = statement.executeQuery(query);
@@ -176,7 +178,8 @@ public class DbHelper {
         Statement statement = null;
 
         try {
-            connection = DriverManager.getConnection(tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
+            connection = DriverManager.getConnection(
+                    tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
             statement = connection.createStatement();
             String query = "DELETE FROM " + tableConnectionInfo.tableName + " WHERE id = " + id;
             statement.executeQuery(query);
@@ -188,14 +191,34 @@ public class DbHelper {
         }
     }
 
-    public static ResultTableData getTableResultSet(TableConnectionInfo tableConnectionInfo, int skip, int top, String orderby) throws JsonProcessingException {
+    public static void postNewRecord(TableConnectionInfo tableConnectionInfo, String postQuery) {
+        Connection connection = null;
+        Statement statement = null;
+        try {
+            connection = DriverManager.getConnection(
+                    tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
+            statement = connection.createStatement();
+            statement.execute(postQuery);
+        } catch (Exception e) {
+        } finally {
+            try { statement.close(); } catch (Exception e) { /* Ignored */ }
+            try { connection.close(); } catch (Exception e) { /* Ignored */ }
+        }
+    }
+
+    public static ResultTableData getTableResultSet(TableConnectionInfo tableConnectionInfo,
+            int skip,
+            int top,
+            String orderby) throws JsonProcessingException {
+
         Connection connection = null;
         Statement statement = null;
 
 
         int totalCount = 0;
         try {
-            connection = DriverManager.getConnection(tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
+            connection = DriverManager.getConnection(
+                    tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
             statement = connection.createStatement();
 
             String query = "SELECT COUNT(*) FROM " + tableConnectionInfo.tableName;
@@ -228,9 +251,4 @@ public class DbHelper {
         }
         return null;
     }
-
-
-
-
-
 }
