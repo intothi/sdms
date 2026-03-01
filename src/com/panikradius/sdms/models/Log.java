@@ -1,4 +1,4 @@
-package com.panikradius.sdms;
+package com.panikradius.sdms.models;
 
 import java.sql.Timestamp;
 
@@ -14,5 +14,12 @@ public class Log {
         this.msg = msg;
         this.level = level;
         this.logDate = logDate;
+    }
+
+    public enum LogLevel {
+        FATAL,
+        ERROR,
+        WARN,
+        INFO
     }
 }

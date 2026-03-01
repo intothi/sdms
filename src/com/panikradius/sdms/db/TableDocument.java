@@ -54,14 +54,13 @@ public class TableDocument {
                     tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
 
             String query = "INSERT INTO " + tableConnectionInfo.tableName +
-                    " (id, name, comment, dateDocument, dateTimeArchived) " +
-                    " VALUES (?,?,?,?,?)";
+                    " (name, comment, dateDocument, dateTimeArchived) " +
+                    " VALUES (?,?,?,?)";
 
             preparedStatement = connection.prepareStatement(query);
-            preparedStatement.setInt(1, 0);
-            preparedStatement.setString(2, document.name);
-            preparedStatement.setString(3, document.comment);
-            preparedStatement.setDate(4, document.dateDocument);
+            preparedStatement.setString(1, document.name);
+            preparedStatement.setString(2, document.comment);
+            preparedStatement.setDate(3, document.dateDocument);
             preparedStatement.setTimestamp(4, new java.sql.Timestamp(System.currentTimeMillis()));
             preparedStatement.executeUpdate();
 
@@ -91,12 +90,6 @@ public class TableDocument {
             );
         }
 
-        // qm 45
-        // Geschoss
-        // Versicherungssumme  30800
-        // sachveresicherung@allianz.de
-        // Vertragsnummer
-
         String items = new ObjectMapper().writer().withDefaultPrettyPrinter().writeValueAsString(documents);
 
         String result = "{ " +
@@ -105,6 +98,4 @@ public class TableDocument {
                 "}";
         return result;
     }
-
-
 }

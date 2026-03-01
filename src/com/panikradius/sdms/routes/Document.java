@@ -6,6 +6,7 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
@@ -26,34 +27,26 @@ public class Document {
         return TableDocument.getTable(skip, top);
     }
 
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    public String getSingle(@QueryParam("id") int id) throws JsonProcessingException {
-        return TableDocument.get(id);
-    }
+//    @GET
+//    @Produces(MediaType.APPLICATION_JSON)
+//    public String getSingle(@QueryParam("id") int id) throws JsonProcessingException {
+//        return TableDocument.get(id);
+//    }
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.TEXT_PLAIN)
-    public Response post(com.panikradius.sdms.models.Document documentApi) {
-
-        com.panikradius.sdms.models.Document document = new com.panikradius.sdms.models.Document(
-                0,
-                documentApi.name,
-                documentApi.comment,
-                documentApi.filePath,
-                documentApi.dateDocument,
-                null
-        );
-
+    public Response post(com.panikradius.sdms.models.Document document) {
+        //TODO TAG validation --> check for double entries
         TableDocument.post(document);
         return Response.ok().build();
     }
 
-    @DELETE
-    @Produces(MediaType.TEXT_PLAIN)
-    public Response delete(@QueryParam("id") int id) {
-        TableDocument.deleteById(id);
-        return Response.ok().build();
-    }
+
+//    @DELETE
+//    @Produces(MediaType.TEXT_PLAIN)
+//    public Response delete(@QueryParam("id") int id) {
+//        TableDocument.deleteById(id);
+//        return Response.ok().build();
+//    }
 }

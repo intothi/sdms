@@ -3,6 +3,7 @@ package com.panikradius.sdms;
 
 import com.panikradius.sdms.db.TableDocument;
 import com.panikradius.sdms.db.TableLog;
+import com.panikradius.sdms.db.TableTag;
 import com.sun.net.httpserver.HttpServer;
 import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -26,7 +27,7 @@ public class App {
 
         System.out.println("init backend");
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
-        ResourceConfig rc = new ResourceConfig().packages("com.panikradius.panikHubBackend.routes");
+        ResourceConfig rc = new ResourceConfig().packages("com.panikradius.sdms.routes");
         rc.register(new CorsFilter());
         rc.register(org.glassfish.jersey.jackson.JacksonFeature.class);
         rc.register(org.glassfish.jersey.media.multipart.MultiPartFeature.class);
@@ -65,6 +66,7 @@ public class App {
         System.out.println("creating tables");
         TableDocument.buildTable();
         TableLog.buildTable();
+        TableTag.buildTable();
         System.out.println("finished creating tables");
     }
 

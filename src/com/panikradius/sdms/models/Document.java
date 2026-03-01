@@ -12,19 +12,20 @@ public class Document {
 
     //TODO Filesize
     public Date dateDocument;
-    public Timestamp dateTimeArchived;
+    public Timestamp dateTimeCreated;
 
+    // empty constructor is for Jackson deserialization
     public Document(){}
 
     public Document(int id, String name, String comment, String filePath,
-                    Date dateDocument, Timestamp dateTimeArchived) {
+                    Date dateDocument, Timestamp dateTimeCreated) {
 
         this.id = id;
         this.name = name;
         this.comment = comment;
         this.filePath = filePath;
         this.dateDocument = dateDocument;
-        this.dateTimeArchived = dateTimeArchived;
+        this.dateTimeCreated = dateTimeCreated;
     }
 
 }

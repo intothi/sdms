@@ -182,7 +182,7 @@ public class DbHelper {
                     tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
             statement = connection.createStatement();
             String query = "DELETE FROM " + tableConnectionInfo.tableName + " WHERE id = " + id;
-            statement.executeQuery(query);
+            statement.executeUpdate(query);
         } catch (Exception e) {
             System.out.println(e);
         } finally {
@@ -239,7 +239,11 @@ public class DbHelper {
                 orderby = str.toString();
             }
 
-            query = "SELECT * FROM " + tableConnectionInfo.tableName + orderby + " LIMIT " + skip + "," + top;
+            query = "SELECT * FROM " + tableConnectionInfo.tableName + orderby;
+
+            if (top != 0 ) {
+                query = query + " LIMIT " + skip + "," + top;
+            }
 
             return new ResultTableData(statement.executeQuery(query), totalCount);
 

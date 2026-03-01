@@ -3,6 +3,7 @@ package com.panikradius.sdms.db;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.panikradius.sdms.models.Log;
+import com.panikradius.sdms.models.Tag;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -12,24 +13,28 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 
-public class TableLog {
+public class TableTag {
 
     public static TableConnectionInfo tableConnectionInfo = new TableConnectionInfo(
             DbConnection.DATABASE_NAME,
-            "log",
+            "tag",
             DbConnection.USER,
             DbConnection.PW
     );
 
     public static String QUERY_CREATE =  "CREATE TABLE " + tableConnectionInfo.tableName + " ("
             + "id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
-            + "msg VARCHAR (4095) NOT NULL, "
-            + "logLevel CHAR (7) NOT NULL, "
-            + "logDate DATETIME, "
+            + "name VARCHAR (32) NOT NULL, "
+            + "color CHAR (7) NOT NULL, "
+            + "dateTimeCreated DATETIME, "
             + "PRIMARY KEY (id)"
             + ")";
 
-    public static void postPreparedStatement(Log log) {
+    public static void buildTable() {
+        DbHelper.buildTable(tableConnectionInfo, QUERY_CREATE);
+    }
+
+    public static void postPreparedStatement(Tag tag) {
         Connection connection = null;
         PreparedStatement preparedStatement = null;
 
@@ -40,13 +45,13 @@ public class TableLog {
                     tableConnectionInfo.pw);
 
             String query = "INSERT INTO " + tableConnectionInfo.tableName +
-                    " (msg, logLevel, logDate) " +
+                    " (name, color, dateTimeCreated) " +
                     " VALUES (?,?,?)";
 
             preparedStatement = connection.prepareStatement(query);
-            preparedStatement.setString(1, log.msg);
-            preparedStatement.setString(2, log.level.toString());
-            preparedStatement.setTimestamp(3, log.logDate);
+            preparedStatement.setString(1, tag.name);
+            preparedStatement.setString(2, tag.color);
+            preparedStatement.setTimestamp(3, tag.dateTimeCreated);
             preparedStatement.executeUpdate();
 
         } catch (Exception e) {
@@ -54,10 +59,6 @@ public class TableLog {
             try { preparedStatement.close(); } catch (Exception e) { /* Ignored */ }
             try { connection.close(); } catch (Exception e) { /* Ignored */ }
         }
-    }
-
-    public static void buildTable() {
-        DbHelper.buildTable(tableConnectionInfo, QUERY_CREATE);
     }
 
     public static String get(int id) throws JsonProcessingException {
@@ -68,9 +69,35 @@ public class TableLog {
         DbHelper.deleteById(tableConnectionInfo, id);
     }
 
-    public static String getTable(int skip, int top) throws JsonProcessingException, SQLException {
+    public static void EditById(int id, com.panikradius.sdms.models.Tag tag) {
+        Connection connection = null;
+        PreparedStatement preparedStatement = null;
 
-        String orderBy = "ORDER BY logDate DESC";
+        try {
+            connection = DriverManager.getConnection(
+                    tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
+
+            String query = "UPDATE " + tableConnectionInfo.tableName +
+                    " SET name = ?, color = ? WHERE id = ?";
+
+            preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setString(1, tag.name);
+            preparedStatement.setString(2, tag.color);
+            preparedStatement.setInt(3, id);
+            preparedStatement.executeUpdate();
+
+
+        } catch (Exception e) {
+        } finally {
+            try { preparedStatement.close(); } catch (Exception e) { /* Ignored */ }
+            try { connection.close(); } catch (Exception e) { /* Ignored */ }
+        }
+    }
+
+    public static String getTable(int skip, int top)
+            throws JsonProcessingException, SQLException {
+
+        String orderBy = "ORDER BY name DESC";
 
         com.panikradius.sdms.ResultTableData resultTableData =
                 DbHelper.getTableResultSet(tableConnectionInfo, skip, top, orderBy);
@@ -79,13 +106,14 @@ public class TableLog {
         ResultSet resultSet = resultTableData.resultSet;
         if (resultSet == null) { return ""; }
 
-        ArrayList<Log> fetchResult = new ArrayList<Log>();
+        ArrayList<Tag> fetchResult = new ArrayList<Tag>();
         while (resultSet.next()) {
-            fetchResult.add(new Log(
-                    Integer.parseInt(resultSet.getString(1)),
-                    resultSet.getString(2),
-                    Log.LogLevel.valueOf(resultSet.getString(3)),
-                    Timestamp.valueOf(resultSet.getString(4))
+            fetchResult.add(
+                    new Tag(
+                            Integer.parseInt(resultSet.getString(1)),
+                            resultSet.getString(2),
+                            resultSet.getString(3),
+                            Timestamp.valueOf(resultSet.getString(4))
             ));
         }
 
@@ -99,3 +127,4 @@ public class TableLog {
         return result;
     }
 }
+
