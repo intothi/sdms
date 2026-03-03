@@ -15,14 +15,16 @@ import java.util.ArrayList;
 
 public class TableTag {
 
-    public static TableConnectionInfo tableConnectionInfo = new TableConnectionInfo(
-            DbConnection.DATABASE_NAME,
-            "tag",
-            DbConnection.USER,
-            DbConnection.PW
+    public static TableConnectionInfo tableConnectionInfo =
+            new TableConnectionInfo(
+                    DbConnection.DATABASE_NAME,
+                    "tag",
+                    DbConnection.USER,
+                    DbConnection.PW
     );
 
-    public static String QUERY_CREATE =  "CREATE TABLE " + tableConnectionInfo.tableName + " ("
+    public static String QUERY_CREATE =
+            "CREATE TABLE " + tableConnectionInfo.tableName + " ("
             + "id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
             + "name VARCHAR (32) NOT NULL, "
             + "color CHAR (7) NOT NULL, "

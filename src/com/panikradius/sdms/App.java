@@ -67,6 +67,7 @@ public class App {
         TableDocument.buildTable();
         TableLog.buildTable();
         TableTag.buildTable();
+        TableDocument.buildTable();
         System.out.println("finished creating tables");
     }
 
