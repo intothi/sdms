@@ -11,6 +11,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 
@@ -24,7 +25,7 @@ public class TableDocument {
     );
 
     private static final String QUERY_CREATE =  "CREATE TABLE " + tableConnectionInfo.tableName + " ("
-            + "id INT NOT NULL AUTO_INCREMENT, "
+            + "id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
             + "name VARCHAR (255) NOT NULL, "
             + "comment VARCHAR (4095) NOT NULL, "
             + "dateDocument DATE, "
@@ -44,31 +45,33 @@ public class TableDocument {
         DbHelper.deleteById(tableConnectionInfo, id);
     }
 
-    public static void post(Document document) {
+    public static int post(Connection connection, Document document) {
 
-        Connection connection = null;
         PreparedStatement preparedStatement = null;
-
+        int documentID = 0;
         try {
-            connection = DriverManager.getConnection(
-                    tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
 
             String query = "INSERT INTO " + tableConnectionInfo.tableName +
                     " (name, comment, dateDocument, dateTimeArchived) " +
                     " VALUES (?,?,?,?)";
 
-            preparedStatement = connection.prepareStatement(query);
+            preparedStatement = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
             preparedStatement.setString(1, document.name);
             preparedStatement.setString(2, document.comment);
             preparedStatement.setDate(3, document.dateDocument);
             preparedStatement.setTimestamp(4, new java.sql.Timestamp(System.currentTimeMillis()));
             preparedStatement.executeUpdate();
+            ResultSet resultSet = preparedStatement.getGeneratedKeys();
+            if (resultSet.next()) {
+                documentID = resultSet.getInt(1);
+            }
 
         } catch (Exception e) {
         } finally {
             try { preparedStatement.close(); } catch (Exception e) { /* Ignored */ }
-            try { connection.close(); } catch (Exception e) { /* Ignored */ }
         }
+
+        return documentID;
     }
 
     public static String getTable(int skip, int top) throws JsonProcessingException, SQLException {
@@ -84,7 +87,6 @@ public class TableDocument {
                     Integer.parseInt(resultSet.getString(1)),
                     resultSet.getString(2),
                     resultSet.getString(3),
-                    resultSet.getString(4),
                     Date.valueOf(resultSet.getString(5)),
                     Timestamp.valueOf(resultSet.getString(6)))
             );

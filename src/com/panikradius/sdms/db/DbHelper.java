@@ -49,7 +49,7 @@ public class DbHelper {
         } finally {
             try { connection.close(); } catch (Exception e) { /* Ignored */ }
         }
-
+        System.out.println(" --> success");
         return true;
     }
 
@@ -110,7 +110,6 @@ public class DbHelper {
             try { statement.close(); } catch (Exception e) { /* Ignored */ }
             try { connection.close(); } catch (Exception e) { /* Ignored */ }
         }
-
     }
 
     public static void buildTable(TableConnectionInfo tableConnectionInfo, String queryCreate) {

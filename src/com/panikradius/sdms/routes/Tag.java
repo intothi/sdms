@@ -36,6 +36,7 @@ public class Tag {
     @Path("/post")
     @Consumes(MediaType.APPLICATION_JSON)
     public Response post(com.panikradius.sdms.models.Tag tag) {
+        //TODO TAG validation --> check for double entries
         tag.dateTimeCreated = new java.sql.Timestamp(System.currentTimeMillis());
         TableTag.postPreparedStatement(tag);
         return Response.ok().build();

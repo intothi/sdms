@@ -2,10 +2,12 @@
 package com.panikradius.sdms;
 
 import com.panikradius.sdms.db.TableDocument;
+import com.panikradius.sdms.db.TableDocumentTag;
 import com.panikradius.sdms.db.TableLog;
 import com.panikradius.sdms.db.TableTag;
 import com.sun.net.httpserver.HttpServer;
 import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;
+import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 
 import java.io.File;
@@ -17,8 +19,9 @@ import java.util.TimeZone;
 
 public class App {
 
+    public static final boolean devMode = true;
     public static final String projectName = "dms";
-    private static String pathToDms = System.getProperty("user.home") + "/dms";
+    public static final String pathToDms = System.getProperty("user.home") + "/sdms/";
 
     public static void main(String[] args) {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
@@ -28,6 +31,8 @@ public class App {
         System.out.println("init backend");
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         ResourceConfig rc = new ResourceConfig().packages("com.panikradius.sdms.routes");
+        rc.register(MultiPartFeature.class);
+
         rc.register(new CorsFilter());
         rc.register(org.glassfish.jersey.jackson.JacksonFeature.class);
         rc.register(org.glassfish.jersey.media.multipart.MultiPartFeature.class);
@@ -67,7 +72,7 @@ public class App {
         TableDocument.buildTable();
         TableLog.buildTable();
         TableTag.buildTable();
-        TableDocument.buildTable();
+        TableDocumentTag.buildTable();
         System.out.println("finished creating tables");
     }
 
@@ -83,6 +88,4 @@ public class App {
             }
         }
     }
-
-
 }

@@ -20,7 +20,7 @@ public class TableDocumentTag {
     public static String QUERY_CREATE =
             "CREATE TABLE " + tableConnectionInfo.tableName + " ("
                     + "documentID INT UNSIGNED NOT NULL, "
-                    + "tagID INT NOT NULL, "
+                    + "tagID INT UNSIGNED NOT NULL, "
                     + "PRIMARY KEY (documentID, tagID), "
                     + "FOREIGN KEY (documentID) REFERENCES document(id), "
                     + "FOREIGN KEY (tagID) REFERENCES tag(id)"
@@ -30,15 +30,12 @@ public class TableDocumentTag {
         DbHelper.buildTable(tableConnectionInfo, QUERY_CREATE);
     }
 
-    public static void postPreparedStatement(DocumentTag documentTag) {
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
+    public static void postPreparedStatement(
+            Connection connection,
+            DocumentTag documentTag) {
 
+        PreparedStatement preparedStatement = null;
         try {
-            connection = DriverManager.getConnection(
-                    tableConnectionInfo.dbConnectionURL,
-                    tableConnectionInfo.user,
-                    tableConnectionInfo.pw);
 
             String query = "INSERT INTO " + tableConnectionInfo.tableName +
                     " (documentID, tagID) " +
@@ -52,7 +49,6 @@ public class TableDocumentTag {
         } catch (Exception e) {
         } finally {
             try { preparedStatement.close(); } catch (Exception e) { /* Ignored */ }
-            try { connection.close(); } catch (Exception e) { /* Ignored */ }
         }
     }
 }
