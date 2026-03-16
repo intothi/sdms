@@ -63,31 +63,35 @@ public class TableTag {
         }
     }
 
-    public static void checkForDoubleEntry(
-            int id,
-            com.panikradius.sdms.models.Tag tag,
-            boolean chaseSensitive) {
+    public static boolean isAlreadyExisting(com.panikradius.sdms.models.Tag tag) {
 
         Connection connection = null;
         PreparedStatement preparedStatement = null;
 
         try {
             connection = DriverManager.getConnection(
-                    tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
+                    tableConnectionInfo.dbConnectionURL,
+                    tableConnectionInfo.user,
+                    tableConnectionInfo.pw);
 
             // Maria DB default is case insensitiv --> utf8_general_ci
             String query = "SELECT COUNT(*) FROM tag WHERE name = ?";
 
             preparedStatement = connection.prepareStatement(query);
             preparedStatement.setString(1, tag.name);
-            preparedStatement.executeUpdate();
 
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            resultSet.first();
+            return resultSet.getInt(1) != 0;
 
         } catch (Exception e) {
         } finally {
             try { preparedStatement.close(); } catch (Exception e) { /* Ignored */ }
             try { connection.close(); } catch (Exception e) { /* Ignored */ }
         }
+
+        return false;
     }
 
     public static String get(int id) throws JsonProcessingException {

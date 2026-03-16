@@ -47,6 +47,11 @@ public class App {
         HttpServer server = JdkHttpServerFactory.createHttpServer(URI.create("http://localhost:8080/v1"), rc);
         System.out.println("backend is listening ...");
 
+        // Kategorien zu Tags
+        // Fristen + Häckchen setzen können
+        // Notifikation
+        // Farben der Tags festlegen (32 oder so)
+
     }
 
     private static void dbTest() {

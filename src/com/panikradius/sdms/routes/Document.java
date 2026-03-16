@@ -34,17 +34,23 @@ public class Document {
     @GET
     @Path("/table")
     @Produces(MediaType.APPLICATION_JSON)
-    public String getMany(@QueryParam("skip") int skip, @QueryParam("top") int top)
+    public String getMany(
+            @QueryParam("skip") int skip,
+            @QueryParam("top") int top,
+            @QueryParam("name") String name,
+            @QueryParam("tags") String tags)
             throws JsonProcessingException, SQLException {
 
-        return TableDocument.getTable(skip, top);
+        String[] parts = !tags.isEmpty() ? tags.split(",") : new String[0];
+
+        return TableDocument.getTable(skip, top, name, parts);
     }
 
-//    @GET
-//    @Produces(MediaType.APPLICATION_JSON)
-//    public String getSingle(@QueryParam("id") int id) throws JsonProcessingException {
-//        return TableDocument.get(id);
-//    }
+    @GET
+    @Produces("application/pdf")
+    public Response getSingle(@QueryParam("fileName") String fileName) {
+        return TableDocument.get(fileName);
+    }
 
     @POST
     @Path("/post")
@@ -53,19 +59,23 @@ public class Document {
     public Response post(
             @FormDataParam("file") InputStream fileStream,
             @FormDataParam("file") FormDataContentDisposition fileInfo,
-            @FormDataParam("name") String name,
             @FormDataParam("comment") String comment,
             @FormDataParam("tagIds") String tagIds,
             @FormDataParam("dateDocument") String dateDocument
     ) {
 
         long timeDB = System.nanoTime();
-        long size = fileInfo.getSize();
-        // TODO check vor duplicates in DB
+        String fileName = fileInfo.getFileName();
+
+        if (TableDocument.isAlreadyExisting(fileName)) {
+            String msg = "could not save document with name: " + fileName + " because it already exists";
+            Logger.log(msg, Log.LogLevel.INFO);
+            return Response.serverError().build();
+        }
 
         try {
             com.panikradius.sdms.models.Document document = new com.panikradius.sdms.models.Document();
-            document.name = name;
+            document.fileName = fileName;
             document.comment = comment;
             document.dateDocument = Date.valueOf(dateDocument);
             document.dateTimeArchived = new java.sql.Timestamp(System.currentTimeMillis());
@@ -81,16 +91,18 @@ public class Document {
                 throw new Exception();
             }
 
-            String[] parts = tagIds.split(",");
-            int[] tagIdArray = new int[parts.length];
-            for (int i = 0; i<parts.length; i++) {
-                tagIdArray[i] = Integer.parseInt(parts[i]);
-            }
+            if (!tagIds.equals("")) {
+                String[] parts = tagIds.split(",");
+                int[] tagIdArray = new int[parts.length];
+                for (int i = 0; i<parts.length; i++) {
+                    tagIdArray[i] = Integer.parseInt(parts[i]);
+                }
 
-            for (int i = 0; i< tagIdArray.length; i++) {
-                TableDocumentTag.postPreparedStatement(
-                        connection,
-                        new DocumentTag(documentID, tagIdArray[i]));
+                for (int i = 0; i< tagIdArray.length; i++) {
+                    TableDocumentTag.postPreparedStatement(
+                            connection,
+                            new DocumentTag(documentID, tagIdArray[i]));
+                }
             }
 
             connection.commit();
@@ -98,6 +110,7 @@ public class Document {
             
         } catch (Exception e) {
             String msg = "Database error";
+            System.out.println(e.getMessage());
             Logger.log(msg, Log.LogLevel.ERROR);
             return Response.serverError().entity(msg).build();
         }
@@ -105,29 +118,20 @@ public class Document {
         timeDB = (System.nanoTime() - timeDB) / 1000000;
 
         long timeIO = System.nanoTime();
-        String path = App.pathToDms + fileInfo.getFileName();
+
+        String path = App.pathToDms + fileName;
         try {
             Files.copy(fileStream, Paths.get(path));
         } catch (IOException e) {
             // TODO exception file already exists
-            String msg = "File write error";
+            String msg = "File write error: " + fileName;
             Logger.log(msg, Log.LogLevel.ERROR);
             return Response.serverError().entity(msg).build();
         }
         timeIO = (System.nanoTime() - timeIO) / 1000000;
 
-        String msg = "archived document --> savetimeDB=" + timeDB + " / savetimeIO=" + timeIO;
+        String msg = "new document archived --> " + fileName + " --> savetimeDB=" + timeDB + " / savetimeIO=" + timeIO;
         Logger.log(msg, Log.LogLevel.INFO);
-
         return Response.ok().build();
     }
-
-
-//    @DELETE
-//    @Produces(MediaType.TEXT_PLAIN)
-//    public Response delete(@QueryParam("id") int id) {
-//        TableDocument.deleteById(id);
-//        return Response.ok().build();
-//    }
-
 }

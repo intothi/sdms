@@ -1,7 +1,9 @@
 package com.panikradius.sdms.routes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.panikradius.sdms.Logger;
 import com.panikradius.sdms.db.TableTag;
+import com.panikradius.sdms.models.Log;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
@@ -37,6 +39,11 @@ public class Tag {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response post(com.panikradius.sdms.models.Tag tag) {
         //TODO TAG validation --> check for double entries
+        if (TableTag.isAlreadyExisting(tag)) {
+            String msg = "could not save tag with name: " + tag.name + " because it already exists";
+            Logger.log(msg, Log.LogLevel.INFO);
+            return Response.serverError().build();
+        }
         tag.dateTimeCreated = new java.sql.Timestamp(System.currentTimeMillis());
         TableTag.postPreparedStatement(tag);
         return Response.ok().build();
