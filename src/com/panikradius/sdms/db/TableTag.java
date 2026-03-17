@@ -23,17 +23,69 @@ public class TableTag {
                     DbConnection.PW
     );
 
-    public static String QUERY_CREATE =
-            "CREATE TABLE " + tableConnectionInfo.tableName + " ("
+    public static String QUERY_CREATE = "CREATE TABLE " + tableConnectionInfo.tableName + " ("
             + "id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
-            + "name VARCHAR (32) NOT NULL, "
-            + "color CHAR (7) NOT NULL, "
+            + "name VARCHAR(32) NOT NULL, "
+            + "colorId INT UNSIGNED NOT NULL, "
+            + "categoryId INT UNSIGNED, "
             + "dateTimeCreated DATETIME, "
-            + "PRIMARY KEY (id)"
+            + "PRIMARY KEY (id), "
+            + "FOREIGN KEY (colorId) REFERENCES color(id), "
+            + "FOREIGN KEY (categoryId) REFERENCES category(id)"
             + ")";
 
     public static void buildTable() {
         DbHelper.buildTable(tableConnectionInfo, QUERY_CREATE);
+    }
+
+    public static void insertDefaultTags(Connection connection) throws SQLException {
+
+        if (DbHelper.hasEntry(tableConnectionInfo, "")) {
+            return;
+        }
+
+        String query = "INSERT INTO " + tableConnectionInfo.tableName +
+                "(name, colorId, categoryId, dateTimeCreated) VALUES (?, ?, ?, NOW())";
+        PreparedStatement preparedStatement = connection.prepareStatement(query);
+
+        String[][] tagData = {
+                // { name, colorId, categoryId }
+                // Dokumentenart
+                { "Rechnung",          "1",  "1" },
+                { "Vertrag",           "6",  "1" },
+                { "Kontoauszug",       "1",  "1" },
+                { "Bescheid",          "3",  "1" },
+                { "Quittung",          "10", "1" },
+                { "Angebot",           "9",  "1" },
+                { "Garantie",          "5",  "1" },
+                { "Ausweis/Zertifikat","4",  "1" },
+                // Absender
+                { "Versicherung",      "6",  "2" },
+                { "Bank",              "1",  "2" },
+                { "Finanzamt",         "3",  "2" },
+                { "Arzt/Gesundheit",   "7",  "2" },
+                { "Arbeitgeber",       "9",  "2" },
+                { "Wohnung/Miete",     "10", "2" },
+                { "Fahrzeug",          "5",  "2" },
+                { "Internet/Telefon",  "10", "2" },
+                // Status
+                { "Dringend",          "3",  "3" },
+                { "Erledigt",          "2",  "3" },
+                { "Offen",             "1",  "3" },
+                { "Archiv",            "8",  "3" },
+                // Person
+                { "Christoph",         "1",  "4" },
+                { "Simone",            "4",  "4" },
+        };
+
+        for (int i = 0; i < tagData.length; i++) {
+            preparedStatement.setString(1, tagData[i][0]);
+            preparedStatement.setInt(2, Integer.parseInt(tagData[i][1]));
+            preparedStatement.setInt(3, Integer.parseInt(tagData[i][2]));
+            preparedStatement.executeUpdate();
+        }
+
+        preparedStatement.close();
     }
 
     public static void postPreparedStatement(Tag tag) {
@@ -47,13 +99,13 @@ public class TableTag {
                     tableConnectionInfo.pw);
 
             String query = "INSERT INTO " + tableConnectionInfo.tableName +
-                    " (name, color, dateTimeCreated) " +
-                    " VALUES (?,?,?)";
+                    " (name, colorId, categoryId, dateTimeCreated) " +
+                    " VALUES (?,?,?,NOW())";
 
             preparedStatement = connection.prepareStatement(query);
             preparedStatement.setString(1, tag.name);
-            preparedStatement.setString(2, tag.color);
-            preparedStatement.setTimestamp(3, tag.dateTimeCreated);
+            preparedStatement.setInt(2, tag.colorId);
+            preparedStatement.setInt(3, tag.categoryId);
             preparedStatement.executeUpdate();
 
         } catch (Exception e) {
@@ -111,14 +163,14 @@ public class TableTag {
                     tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
 
             String query = "UPDATE " + tableConnectionInfo.tableName +
-                    " SET name = ?, color = ? WHERE id = ?";
+                    " SET name = ?, colorId = ?, categoryId = ? WHERE id = ?";
 
             preparedStatement = connection.prepareStatement(query);
             preparedStatement.setString(1, tag.name);
-            preparedStatement.setString(2, tag.color);
-            preparedStatement.setInt(3, id);
+            preparedStatement.setInt(2, tag.colorId);
+            preparedStatement.setInt(3, tag.categoryId);
+            preparedStatement.setInt(4, id);
             preparedStatement.executeUpdate();
-
 
         } catch (Exception e) {
         } finally {
@@ -130,34 +182,108 @@ public class TableTag {
     public static String getTable(int skip, int top)
             throws JsonProcessingException, SQLException {
 
-        String orderBy = "ORDER BY name DESC";
+        Connection connection = null;
+        PreparedStatement preparedStatement = null;
 
-        com.panikradius.sdms.ResultTableData resultTableData =
-                DbHelper.getTableResultSet(tableConnectionInfo, skip, top, orderBy);
+        try {
+            connection = DriverManager.getConnection(
+                    tableConnectionInfo.dbConnectionURL,
+                    tableConnectionInfo.user,
+                    tableConnectionInfo.pw);
 
-        if (resultTableData == null) {return "";}
-        ResultSet resultSet = resultTableData.resultSet;
-        if (resultSet == null) { return ""; }
+            String countQuery = "SELECT COUNT(*) FROM " + tableConnectionInfo.tableName;
+            ResultSet countResult = connection.createStatement().executeQuery(countQuery);
+            int totalCount = 0;
+            if (countResult.next()) {
+                totalCount = countResult.getInt(1);
+            }
 
-        ArrayList<Tag> fetchResult = new ArrayList<Tag>();
-        while (resultSet.next()) {
-            fetchResult.add(
-                    new Tag(
-                            Integer.parseInt(resultSet.getString(1)),
-                            resultSet.getString(2),
-                            resultSet.getString(3),
-                            Timestamp.valueOf(resultSet.getString(4))
-            ));
+            if (totalCount == 0) {
+                return "{ \"items\": [], \"totalCount\": 0 }";
+            }
+
+            StringBuilder query = new StringBuilder();
+            query.append("SELECT t.id, t.name, t.colorId, t.categoryId, t.dateTimeCreated, c.color AS colorHex ");
+            query.append("FROM " + tableConnectionInfo.tableName + " t ");
+            query.append("LEFT JOIN color c ON c.id = t.colorId ");
+            query.append("ORDER BY t.id ");
+
+            if (top != 0) {
+                query.append("LIMIT ? OFFSET ?");
+                preparedStatement = connection.prepareStatement(query.toString());
+                preparedStatement.setInt(1, top);
+                preparedStatement.setInt(2, skip);
+            } else {
+                preparedStatement = connection.prepareStatement(query.toString());
+            }
+
+//            String query = "SELECT t.id, t.name, t.categoryId, t.dateTimeCreated, c.color AS colorHex " +
+//                    "FROM " + tableConnectionInfo.tableName + " t " +
+//                    "LEFT JOIN color c ON c.id = t.colorId " +
+//                    "ORDER BY t.id " +
+//                    "LIMIT ? OFFSET ?";
+//
+//            preparedStatement = connection.prepareStatement(query);
+//            preparedStatement.setInt(1, top);
+//            preparedStatement.setInt(2, skip);
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            ArrayList<Tag> fetchResult = new ArrayList<>();
+            while (resultSet.next()) {
+                Tag tag = new Tag();
+                tag.id = resultSet.getInt("id");
+                tag.name = resultSet.getString("name");
+                tag.categoryId = resultSet.getInt("categoryId");
+                tag.dateTimeCreated = resultSet.getTimestamp("dateTimeCreated");
+                tag.colorId = resultSet.getInt("colorId");
+                tag.color = resultSet.getString("colorHex");
+                fetchResult.add(tag);
+            }
+
+            String items = new ObjectMapper().writer().withDefaultPrettyPrinter()
+                    .writeValueAsString(fetchResult);
+
+            return "{ \"items\": " + items + ", \"totalCount\": " + totalCount + "}";
+
+        } finally {
+            try { preparedStatement.close(); } catch (Exception e) { }
+            try { connection.close(); } catch (Exception e) { }
         }
-
-        String items = new ObjectMapper().writer().withDefaultPrettyPrinter().
-                writeValueAsString(fetchResult);
-
-        String result = "{ " +
-                "\"items\": " + items + "," +
-                "\"totalCount\": " + resultTableData.count +
-                "}";
-        return result;
     }
+
+//    public static String getTable(int skip, int top)
+//            throws JsonProcessingException, SQLException {
+//
+//       // String orderBy = "ORDER BY name DESC";
+//
+//        com.panikradius.sdms.ResultTableData resultTableData =
+//                DbHelper.getTableResultSet(tableConnectionInfo, skip, top, "");
+//
+//        if (resultTableData == null) {return "";}
+//        ResultSet resultSet = resultTableData.resultSet;
+//        if (resultSet == null) { return ""; }
+//
+//        ArrayList<Tag> fetchResult = new ArrayList<Tag>();
+//        while (resultSet.next()) {
+//            fetchResult.add(
+//                    new Tag(
+//                            Integer.parseInt(resultSet.getString(1)),
+//                            resultSet.getString(2),
+//                            Integer.parseInt(resultSet.getString(3)),
+//                            Integer.parseInt(resultSet.getString(4)),
+//                            Timestamp.valueOf(resultSet.getString(5))
+//            ));
+//        }
+//
+//        String items = new ObjectMapper().writer().withDefaultPrettyPrinter().
+//                writeValueAsString(fetchResult);
+//
+//        String result = "{ " +
+//                "\"items\": " + items + "," +
+//                "\"totalCount\": " + resultTableData.count +
+//                "}";
+//        return result;
+//    }
 }
 

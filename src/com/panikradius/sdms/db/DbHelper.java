@@ -2,7 +2,9 @@ package com.panikradius.sdms.db;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.panikradius.sdms.Logger;
 import com.panikradius.sdms.ResultTableData;
+import com.panikradius.sdms.models.Log;
 
 import java.sql.Connection;
 import java.sql.Date;
@@ -95,8 +97,7 @@ public class DbHelper {
                     tableConnectionInfo.user,
                     tableConnectionInfo.pw);
 
-            String query = "SELECT count(*) FROM " + tableConnectionInfo.tableName
-                    + " WHERE " + whereStatement + " LIMIT 1;";
+            String query = "SELECT count(*) FROM " + tableConnectionInfo.tableName;
 
             statement = connection.createStatement();
             resultSet = statement.executeQuery(query);
@@ -183,6 +184,7 @@ public class DbHelper {
             String query = "DELETE FROM " + tableConnectionInfo.tableName + " WHERE id = " + id;
             statement.executeUpdate(query);
         } catch (Exception e) {
+            Logger.log(e.getMessage(), Log.LogLevel.ERROR);
             System.out.println(e);
         } finally {
             try { statement.close(); } catch (Exception e) { /* Ignored */ }

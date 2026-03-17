@@ -152,16 +152,19 @@ public class TableDocument {
 
             String query = "SELECT " +
                     "d.id, d.fileName, d.comment, d.dateDocument, d.dateTimeArchived, " +
-                    "t.id AS tagId, t.name AS tagName, t.color AS tagColor " +
+                    "t.id AS tagId, t.name AS tagName, c.color AS tagColor " +
                     "FROM document d " +
                     "LEFT JOIN document_tag dt ON dt.documentID = d.id " +
                     "LEFT JOIN tag t ON t.id = dt.tagID " +
+                    "LEFT JOIN color c ON c.id = t.colorId " +
                     whereClause +
-                    "ORDER BY d.id " +
-                    "LIMIT ? OFFSET ?";
+                    "ORDER BY d.id ";
 
-            params.add(top);
-            params.add(skip);
+            if (top != 0) {
+                query += "LIMIT ? OFFSET ?";
+                params.add(top);
+                params.add(skip);
+            }
 
             preparedStatement = connection.prepareStatement(query);
             for (int i = 0; i < params.size(); i++) {

@@ -2,7 +2,8 @@ package com.panikradius.sdms.routes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.panikradius.sdms.Logger;
-import com.panikradius.sdms.db.TableTag;
+import com.panikradius.sdms.db.TableCategory;
+import com.panikradius.sdms.db.TableColor;
 import com.panikradius.sdms.models.Log;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -17,44 +18,36 @@ import jakarta.ws.rs.core.Response;
 
 import java.sql.SQLException;
 
-@Path("tag")
-public class Tag {
+@Path("color")
+public class Color {
 
     @GET
     @Path("/table")
     @Produces(MediaType.APPLICATION_JSON)
     public String getMany() throws JsonProcessingException, SQLException {
-        return TableTag.getTable(0, 0);
-    }
-
-    @DELETE
-    @Produces(MediaType.TEXT_PLAIN)
-    public Response delete(@QueryParam("id") int id) {
-        TableTag.deleteById(id);
-        return Response.ok().build();
+        return TableColor.getTable(0, 0);
     }
 
     @POST
     @Path("/post")
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response post(com.panikradius.sdms.models.Tag tag) {
-        //TODO TAG validation --> check for double entries
-        if (TableTag.isAlreadyExisting(tag)) {
-            String msg = "could not save tag with name: " + tag.name + " because it already exists";
-            Logger.log(msg, Log.LogLevel.INFO);
-            return Response.serverError().build();
-        }
-
-        TableTag.postPreparedStatement(tag);
+    public Response post(com.panikradius.sdms.models.Color color) {
+        TableColor.postPreparedStatement(color);
         return Response.ok().build();
     }
 
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
     public Response edit(
-            @QueryParam("id") int id,
-            com.panikradius.sdms.models.Tag tag) {
-        TableTag.EditById(id, tag);
+            com.panikradius.sdms.models.Color color) {
+        TableColor.Edit(color);
+        return Response.ok().build();
+    }
+
+    @DELETE
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response delete(@QueryParam("id") int id) {
+        TableColor.deleteById(id);
         return Response.ok().build();
     }
 }

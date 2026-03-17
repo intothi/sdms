@@ -11,7 +11,4 @@ public class ResultTableData {
         this.resultSet = resultSet;
         this.count = count;
     }
-
-    public static class ToolBox {
-    }
 }

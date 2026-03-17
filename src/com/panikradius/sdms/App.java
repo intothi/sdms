@@ -1,6 +1,9 @@
 
 package com.panikradius.sdms;
 
+import com.panikradius.sdms.db.DbConnection;
+import com.panikradius.sdms.db.TableCategory;
+import com.panikradius.sdms.db.TableColor;
 import com.panikradius.sdms.db.TableDocument;
 import com.panikradius.sdms.db.TableDocumentTag;
 import com.panikradius.sdms.db.TableLog;
@@ -12,6 +15,8 @@ import org.glassfish.jersey.server.ResourceConfig;
 
 import java.io.File;
 import java.net.URI;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
@@ -47,10 +52,8 @@ public class App {
         HttpServer server = JdkHttpServerFactory.createHttpServer(URI.create("http://localhost:8080/v1"), rc);
         System.out.println("backend is listening ...");
 
-        // Kategorien zu Tags
         // Fristen + Häckchen setzen können
         // Notifikation
-        // Farben der Tags festlegen (32 oder so)
 
     }
 
@@ -66,24 +69,52 @@ public class App {
         }
     }
 
-    private static void createEnvironment(){
+    private static void createEnvironment() {
         System.out.println("create Environment...");
-        try { buildTables(); } catch (Exception e) {System.out.println(e);}
+        try {
+            buildTables();
+            fillTables();
+        } catch (Exception e) {
+            System.out.println(e);
+        }
         createDMSPath();
     }
 
-    private static void buildTables() throws SQLException {
+    private static void fillTables() throws SQLException {
+        System.out.println("filling tables");
+        Connection connection = null;
+        try {
+            connection = DriverManager.getConnection(
+                    DbConnection.DB_URL,
+                    DbConnection.USER,
+                    DbConnection.PW);
+            connection.setAutoCommit(false);
+
+            TableColor.insertDefaultColors(connection);
+            TableCategory.insertDefaultCategories(connection);
+            TableTag.insertDefaultTags(connection);
+
+            connection.commit();
+            System.out.println("finished filling tables");
+        } catch (Exception e) {
+            connection.rollback();
+        }
+    }
+
+    private static void buildTables() {
         System.out.println("creating tables");
-        TableDocument.buildTable();
         TableLog.buildTable();
+        TableColor.buildTable();
+        TableCategory.buildTable();
         TableTag.buildTable();
+        TableDocument.buildTable();
         TableDocumentTag.buildTable();
         System.out.println("finished creating tables");
     }
 
     private static void createDMSPath() {
         File dir = new File(pathToDms);
-        if (!dir.exists()){
+        if (!dir.exists()) {
             System.out.print("creating DMS home dir ... ");
             boolean created = dir.mkdirs();
             if (!created) {
