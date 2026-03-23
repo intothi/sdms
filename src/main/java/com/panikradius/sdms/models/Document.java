@@ -33,4 +33,16 @@ public class Document {
         this.dateTimeArchived = dateTimeArchived;
     }
 
+    public Document(
+            String fileName,
+            String comment,
+            Date dateDocument,
+            Timestamp dateTimeArchived) {
+
+        this.fileName = fileName;
+        this.comment = comment;
+        this.dateDocument = dateDocument;
+        this.dateTimeArchived = dateTimeArchived;
+    }
+
 }

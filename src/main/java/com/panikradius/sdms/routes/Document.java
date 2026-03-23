@@ -6,9 +6,11 @@ import com.panikradius.sdms.Logger;
 import com.panikradius.sdms.db.DbConnection;
 import com.panikradius.sdms.db.TableDocument;
 import com.panikradius.sdms.db.TableDocumentTag;
+import com.panikradius.sdms.db.TableTag;
 import com.panikradius.sdms.db.TableTagKeyword;
 import com.panikradius.sdms.models.DocumentTag;
 import com.panikradius.sdms.models.Log;
+import com.panikradius.sdms.models.TagKeyword;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -33,9 +35,12 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 @Path("document")
 public class Document {
@@ -74,13 +79,6 @@ public class Document {
     ) {
 
         long timeDB = System.nanoTime();
-        String fileName = fileInfo.getFileName();
-
-        if (TableDocument.isAlreadyExisting(fileName)) {
-            String msg = "could not save document with name: " + fileName + " because it already exists";
-            Logger.log(msg, Log.LogLevel.INFO);
-            return Response.serverError().build();
-        }
 
         byte [] fileBytes = getFileBytes(inputStream);
         if (fileBytes == null) {
@@ -89,14 +87,48 @@ public class Document {
             return Response.serverError().entity(msg).build();
         }
 
+        Set<Integer> allTagIds = new HashSet<>();
+
+        if (!tagIds.equals("")) {
+            String[] parts = tagIds.split(",");
+
+            for (int i = 0; i<parts.length; i++) {
+                allTagIds.add(Integer.parseInt(parts[i]));
+            }
+        }
+
         Set<Integer> matchedTagIds = getMatchedTagIds(fileBytes);
 
+        allTagIds.addAll(matchedTagIds);
+        Integer[] allTagIdsArray = allTagIds.toArray(new Integer[0]);
+
+        Timestamp timestamp = new java.sql.Timestamp(System.currentTimeMillis());
+        String dateNameForFile = timestamp.toLocalDateTime().
+                format(java.time.format.DateTimeFormatter.ofPattern("yyyy_MM_dd"));
+        String fileName;
+
         try {
-            com.panikradius.sdms.models.Document document = new com.panikradius.sdms.models.Document();
-            document.fileName = fileName;
-            document.comment = comment;
-            document.dateDocument = Date.valueOf(dateDocument);
-            document.dateTimeArchived = new java.sql.Timestamp(System.currentTimeMillis());
+
+            List<String> tagNames = TableTag.getNamesByIds(allTagIdsArray);
+            StringBuilder fileNameBuilder = new StringBuilder(dateNameForFile);
+            for (int i = 0; i < tagNames.size(); i++) {
+                fileNameBuilder.append("_").append(replaceUmlauts(tagNames.get(i)));
+            }
+            fileName = fileNameBuilder + ".pdf";
+
+            if (TableDocument.isAlreadyExisting(fileName)) {
+                String msg = "could not save document with name: " + fileName + " because it already exists";
+                Logger.log(msg, Log.LogLevel.INFO);
+                return Response.serverError().build();
+            }
+
+
+            com.panikradius.sdms.models.Document document = new com.panikradius.sdms.models.Document(
+                    fileName,
+                    comment,
+                    Date.valueOf(dateDocument),
+                    timestamp
+            );
 
             Connection connection = DriverManager.getConnection(
                     DbConnection.DB_URL,
@@ -109,18 +141,6 @@ public class Document {
                 throw new Exception();
             }
 
-            Set<Integer> allTagIds = new HashSet<>();
-            if (!tagIds.equals("")) {
-                String[] parts = tagIds.split(",");
-
-                for (int i = 0; i<parts.length; i++) {
-                    allTagIds.add(Integer.parseInt(parts[i]));
-                }
-            }
-
-            allTagIds.addAll(matchedTagIds);
-
-            Integer[] allTagIdsArray = allTagIds.toArray(new Integer[0]);
             for (int i = 0; i< allTagIdsArray.length; i++) {
                 TableDocumentTag.postPreparedStatement(
                         connection,
@@ -180,15 +200,38 @@ public class Document {
             String text = new PDFTextStripper().getText(doc).toLowerCase();
             doc.close();
 
-            Map<String, Integer> keywordToTagId = TableTagKeyword.getKeywordToTagIdMap();
-            for (Map.Entry<String, Integer> entry : keywordToTagId.entrySet()) {
-                if (text.contains(entry.getKey())) {
-                    matchedTagIds.add(entry.getValue());
+            Map<TagKeyword, Integer> keywordToTagId = TableTagKeyword.getKeywordToTagIdMap();
+
+            for (Map.Entry<TagKeyword, Integer> entry : keywordToTagId.entrySet()) {
+
+                TagKeyword tagKeyword = entry.getKey();
+
+                if (tagKeyword.exactMatch) {
+                    Pattern pattern = Pattern.compile("\\b" + Pattern.quote(tagKeyword.keyword) + "\\b");
+                    if (pattern.matcher(text).find()) {
+                        matchedTagIds.add(entry.getValue());
+                    }
+                } else {
+                    if (text.contains(tagKeyword.keyword)) {
+                        matchedTagIds.add(entry.getValue());
+                    }
                 }
             }
         } catch (Exception e) {
             Logger.log("PDF keyword extraction failed: " + e.getMessage(), Log.LogLevel.ERROR);
         }
         return matchedTagIds;
+    }
+
+    private static String replaceUmlauts(String input) {
+        return input
+                .replace("ä", "ae")
+                .replace("ö", "oe")
+                .replace("ü", "ue")
+                .replace("Ä", "Ae")
+                .replace("Ö", "Oe")
+                .replace("Ü", "Ue")
+                .replace("ß", "ss")
+                .replace("/","_");
     }
 }

@@ -60,9 +60,9 @@ public class TableLog {
         DbHelper.buildTable(tableConnectionInfo, QUERY_CREATE);
     }
 
-    public static String get(int id) throws JsonProcessingException {
-        return DbHelper.getById(tableConnectionInfo, id);
-    }
+//    public static String get(int id) throws JsonProcessingException {
+//        return DbHelper.getById(tableConnectionInfo, id);
+//    }
 
     public static void deleteById(int id) {
         DbHelper.deleteById(tableConnectionInfo, id);

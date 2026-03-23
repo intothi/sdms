@@ -12,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.List;
 
 public class TableTag {
 
@@ -149,9 +150,10 @@ public class TableTag {
         return false;
     }
 
-    public static String get(int id) throws JsonProcessingException {
-        return DbHelper.getById(tableConnectionInfo, id);
-    }
+
+//    public static String get(int id) throws JsonProcessingException {
+//        return DbHelper.getById(tableConnectionInfo, id);
+//    }
 
     public static void deleteById(int id) {
         DbHelper.deleteById(tableConnectionInfo, id);
@@ -242,6 +244,48 @@ public class TableTag {
         } finally {
             try { preparedStatement.close(); } catch (Exception e) { }
             try { connection.close(); } catch (Exception e) { }
+        }
+    }
+
+    public static List<String> getNamesByIds(Integer[] ids) throws SQLException {
+
+        if (ids.length == 0) { return new ArrayList<>(); }
+
+        Connection connection = null;
+        PreparedStatement preparedStatement = null;
+
+        try {
+            connection = DriverManager.getConnection(
+                    tableConnectionInfo.dbConnectionURL,
+                    tableConnectionInfo.user,
+                    tableConnectionInfo.pw);
+
+            StringBuilder placeholders = new StringBuilder();
+            for (int i = 0; i < ids.length; i++) {
+                if (i > 0) { placeholders.append(", "); }
+                placeholders.append("?");
+            }
+
+            String query = "SELECT name FROM " + tableConnectionInfo.tableName +
+                    " WHERE id IN (" + placeholders + ") ORDER BY name";
+
+            preparedStatement = connection.prepareStatement(query);
+            for (int i = 0; i < ids.length; i++) {
+                preparedStatement.setInt(i + 1, ids[i]);
+            }
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            List<String> names = new ArrayList<>();
+            while (resultSet.next()) {
+                names.add(resultSet.getString("name"));
+            }
+
+            return names;
+
+        } finally {
+            try { if (preparedStatement != null) preparedStatement.close(); } catch (Exception e) { }
+            try { if (connection != null) connection.close(); } catch (Exception e) { }
         }
     }
 }

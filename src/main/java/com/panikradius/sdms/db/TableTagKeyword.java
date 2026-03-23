@@ -2,7 +2,6 @@ package com.panikradius.sdms.db;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.panikradius.sdms.models.Tag;
 import com.panikradius.sdms.models.TagKeyword;
 
 import java.sql.Connection;
@@ -12,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class TableTagKeyword {
@@ -28,6 +28,7 @@ public class TableTagKeyword {
             + "id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
             + "tagId INT UNSIGNED NOT NULL, "
             + "keyword VARCHAR(128) NOT NULL, "
+            + "exactMatch BOOLEAN NOT NULL, "
             + "dateTimeCreated DATETIME, "
             + "PRIMARY KEY (id), "
             + "FOREIGN KEY (tagId) REFERENCES tag(id)"
@@ -48,12 +49,13 @@ public class TableTagKeyword {
                     tableConnectionInfo.pw);
 
             String query = "INSERT INTO " + tableConnectionInfo.tableName +
-                    " (tagId, keyword, dateTimeCreated) " +
-                    " VALUES (?,?,NOW())";
+                    " (tagId, keyword, exactMatch, dateTimeCreated) " +
+                    " VALUES (?,?,?,NOW())";
 
             preparedStatement = connection.prepareStatement(query);
             preparedStatement.setInt(1, tagKeyword.tagId);
             preparedStatement.setString(2, tagKeyword.keyword);
+            preparedStatement.setBoolean(3, tagKeyword.exactMatch);
             preparedStatement.executeUpdate();
 
         } catch (Exception e) {
@@ -79,12 +81,13 @@ public class TableTagKeyword {
             );
 
             String query = "UPDATE " + tableConnectionInfo.tableName +
-                    " SET tagId = ?, keyword = ? WHERE id = ?";
+                    " SET tagId = ?, keyword = ?, exactMatch = ? WHERE id = ?";
 
             preparedStatement = connection.prepareStatement(query);
             preparedStatement.setInt(1, tagKeyword.tagId);
             preparedStatement.setString(2, tagKeyword.keyword);
-            preparedStatement.setInt(3, tagKeyword.id);
+            preparedStatement.setBoolean(3,tagKeyword.exactMatch);
+            preparedStatement.setInt(4, tagKeyword.id);
             preparedStatement.executeUpdate();
 
         } catch (Exception e) {
@@ -105,7 +108,7 @@ public class TableTagKeyword {
                     tableConnectionInfo.user,
                     tableConnectionInfo.pw);
 
-            String query = "SELECT id, tagId, keyword, dateTimeCreated" +
+            String query = "SELECT id, tagId, keyword, exactMatch, dateTimeCreated" +
                     " FROM " + tableConnectionInfo.tableName +
                     " ORDER BY tagId";
 
@@ -114,11 +117,13 @@ public class TableTagKeyword {
 
             ArrayList<TagKeyword> fetchResult = new ArrayList<>();
             while (resultSet.next()) {
-                TagKeyword tagKeyword = new TagKeyword();
-                tagKeyword.id              = resultSet.getInt("id");
-                tagKeyword.tagId           = resultSet.getInt("tagId");
-                tagKeyword.keyword         = resultSet.getString("keyword");
-                tagKeyword.dateTimeCreated = resultSet.getTimestamp("dateTimeCreated");
+                TagKeyword tagKeyword = new TagKeyword(
+                        resultSet.getInt("id"),
+                        resultSet.getInt("tagId"),
+                        resultSet.getString("keyword"),
+                        resultSet.getBoolean("exactMatch"),
+                        resultSet.getTimestamp("dateTimeCreated")
+                );
                 fetchResult.add(tagKeyword);
             }
 
@@ -136,7 +141,7 @@ public class TableTagKeyword {
         }
     }
 
-    public static Map<String, Integer> getKeywordToTagIdMap() throws SQLException {
+    public static Map<TagKeyword, Integer> getKeywordToTagIdMap() throws SQLException {
 
         Connection connection = null;
         PreparedStatement preparedStatement = null;
@@ -147,18 +152,17 @@ public class TableTagKeyword {
                     tableConnectionInfo.user,
                     tableConnectionInfo.pw);
 
-            String query = "SELECT keyword, tagId " +
-                    "FROM " + tableConnectionInfo.tableName;
+            String query = "SELECT keyword, tagId, exactMatch FROM " + tableConnectionInfo.tableName;
 
             preparedStatement = connection.prepareStatement(query);
             ResultSet resultSet = preparedStatement.executeQuery();
 
-            Map<String, Integer> keywordToTagId = new HashMap<>();
+            Map<TagKeyword, Integer> keywordToTagId = new HashMap<>();
             while (resultSet.next()) {
-                keywordToTagId.put(
-                        resultSet.getString("keyword").toLowerCase(),
-                        resultSet.getInt("tagId")
-                );
+                TagKeyword tagKeyword = new TagKeyword();
+                tagKeyword.keyword = resultSet.getString("keyword").toLowerCase();
+                tagKeyword.exactMatch = resultSet.getBoolean("exactMatch");
+                keywordToTagId.put(tagKeyword, resultSet.getInt("tagId"));
             }
 
             return keywordToTagId;
@@ -200,5 +204,4 @@ public class TableTagKeyword {
 
         return false;
     }
-
 }

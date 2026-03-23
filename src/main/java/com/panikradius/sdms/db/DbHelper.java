@@ -140,38 +140,38 @@ public class DbHelper {
         }
     }
 
-    public static String getById(TableConnectionInfo tableConnectionInfo, int id) throws JsonProcessingException {
-        Connection connection = null;
-        Statement statement = null;
-        //Product product = null;
-        // TODO(CT) It makes no sense to me, to create an instance of product, in an general helper class
-
-        try {
-            connection = DriverManager.getConnection(
-                    tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
-            statement = connection.createStatement();
-            String query = "SELECT * FROM " + tableConnectionInfo.tableName + " WHERE id = " + id + " LIMIT 1";
-            ResultSet resultSet = statement.executeQuery(query);
-
-            if (resultSet.first()){
-//                product = new Product(
-//                        Integer.parseInt(resultSet.getString(1)),
-//                        resultSet.getString(2),
-//                        resultSet.getString(3),
-//                        Timestamp.valueOf(resultSet.getString(4)),
-//                        Date.valueOf(resultSet.getString(5))
-//                );
-            }
-
-        } catch (Exception e) {
-            System.out.println(e);
-        } finally {
-            try { statement.close(); } catch (Exception e) { /* Ignored */ }
-            try { connection.close(); } catch (Exception e) { /* Ignored */ }
-        }
-        //return new ObjectMapper().writer().withDefaultPrettyPrinter().writeValueAsString(product);
-        return "";
-    }
+//    public static String getById(TableConnectionInfo tableConnectionInfo, int id) throws JsonProcessingException {
+//        Connection connection = null;
+//        Statement statement = null;
+//        //Product product = null;
+//        // TODO(CT) It makes no sense to me, to create an instance of product, in an general helper class
+//
+//        try {
+//            connection = DriverManager.getConnection(
+//                    tableConnectionInfo.dbConnectionURL, tableConnectionInfo.user, tableConnectionInfo.pw);
+//            statement = connection.createStatement();
+//            String query = "SELECT * FROM " + tableConnectionInfo.tableName + " WHERE id = " + id + " LIMIT 1";
+//            ResultSet resultSet = statement.executeQuery(query);
+//
+//            if (resultSet.first()){
+////                product = new Product(
+////                        Integer.parseInt(resultSet.getString(1)),
+////                        resultSet.getString(2),
+////                        resultSet.getString(3),
+////                        Timestamp.valueOf(resultSet.getString(4)),
+////                        Date.valueOf(resultSet.getString(5))
+////                );
+//            }
+//
+//        } catch (Exception e) {
+//            System.out.println(e);
+//        } finally {
+//            try { statement.close(); } catch (Exception e) { /* Ignored */ }
+//            try { connection.close(); } catch (Exception e) { /* Ignored */ }
+//        }
+//        //return new ObjectMapper().writer().withDefaultPrettyPrinter().writeValueAsString(product);
+//        return "";
+//    }
 
     public static void deleteById(TableConnectionInfo tableConnectionInfo, int id) {
         Connection connection = null;

@@ -58,29 +58,6 @@ public class TableDocument {
         } catch (IOException e) {
             return Response.serverError().build();
         }
-
-        //        Connection connection = null;
-//        PreparedStatement preparedStatement = null;
-//        Document document = null;
-//
-//        try {
-//            connection = DriverManager.getConnection(
-//                    tableConnectionInfo.dbConnectionURL,
-//                    tableConnectionInfo.user,
-//                    tableConnectionInfo.pw);
-//
-//            String query = "SELECT * FROM " + tableConnectionInfo.tableName + " WHERE id = " + id + " LIMIT 1";
-//            preparedStatement = connection.prepareStatement(query);
-//
-//            ResultSet resultSet = preparedStatement.executeQuery();
-//
-//            if (resultSet.first()) {
-//                document = new Document();
-//            }
-//
-//        } catch (Exception e) {
-//
-//        }
     }
 
     public static void deleteById(int id) {
