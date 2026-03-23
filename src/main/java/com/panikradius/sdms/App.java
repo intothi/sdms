@@ -8,6 +8,7 @@ import com.panikradius.sdms.db.TableDocument;
 import com.panikradius.sdms.db.TableDocumentTag;
 import com.panikradius.sdms.db.TableLog;
 import com.panikradius.sdms.db.TableTag;
+import com.panikradius.sdms.db.TableTagKeyword;
 import com.sun.net.httpserver.HttpServer;
 import org.glassfish.jersey.jdkhttp.JdkHttpServerFactory;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
@@ -109,6 +110,7 @@ public class App {
         TableTag.buildTable();
         TableDocument.buildTable();
         TableDocumentTag.buildTable();
+        TableTagKeyword.buildTable();
         System.out.println("finished creating tables");
     }
 

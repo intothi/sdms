@@ -1,0 +1,55 @@
+#!/bin/bash
+# ============================================================
+# SDMS Scan Script
+# Wird von scanbd beim Drücken des Scan-Knopfs ausgeführt
+# ============================================================
+
+BACKEND="http://localhost:8080/v1/document/post"
+RESOLUTION=300
+TMPDIR="/tmp/sdms_scan"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+TIFF="$TMPDIR/scan_$TIMESTAMP.tiff"
+PDF="$TMPDIR/scan_$TIMESTAMP"  # tesseract fügt .pdf selbst an
+
+mkdir -p $TMPDIR
+
+echo "SDMS Scan gestartet: $TIMESTAMP"
+
+# ── 1. Scannen ───────────────────────────────────────────────
+scanimage \
+    --device "$SCANBD_DEVICE" \
+    --format=tiff \
+    --resolution $RESOLUTION \
+    --source "ADF Duplex" \
+    > $TIFF
+
+if [ $? -ne 0 ]; then
+    echo "Fehler beim Scannen"
+    exit 1
+fi
+echo "Scan abgeschlossen: $TIFF"
+
+# ── 2. OCR + PDF ─────────────────────────────────────────────
+tesseract $TIFF $PDF -l deu pdf
+
+if [ $? -ne 0 ]; then
+    echo "Fehler bei OCR"
+    exit 1
+fi
+echo "OCR abgeschlossen: $PDF.pdf"
+
+# ── 3. An SDMS Backend senden ─────────────────────────────────
+FILENAME=$(basename "$PDF.pdf")
+curl -s -X POST "$BACKEND" \
+    -F "file=@$PDF.pdf" \
+
+if [ $? -ne 0 ]; then
+    echo "Fehler beim Senden ans Backend"
+    exit 1
+fi
+echo "Dokument erfolgreich hochgeladen: $FILENAME"
+
+# ── 4. Aufräumen ──────────────────────────────────────────────
+rm -f $TIFF $PDF.pdf
+
+echo "SDMS Scan abgeschlossen"

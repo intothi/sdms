@@ -45,7 +45,9 @@ public class TableTag {
         }
 
         String query = "INSERT INTO " + tableConnectionInfo.tableName +
-                "(name, colorId, categoryId, dateTimeCreated) VALUES (?, ?, ?, NOW())";
+                "(name, colorId, categoryId, dateTimeCreated)" +
+                "VALUES (?, ?, ?, NOW())";
+
         PreparedStatement preparedStatement = connection.prepareStatement(query);
 
         String[][] tagData = {
@@ -127,7 +129,8 @@ public class TableTag {
                     tableConnectionInfo.pw);
 
             // Maria DB default is case insensitiv --> utf8_general_ci
-            String query = "SELECT COUNT(*) FROM tag WHERE name = ?";
+            String query = "SELECT COUNT(*) FROM " + tableConnectionInfo.tableName
+                    + " tag WHERE name = ?";
 
             preparedStatement = connection.prepareStatement(query);
             preparedStatement.setString(1, tag.name);
@@ -217,16 +220,6 @@ public class TableTag {
                 preparedStatement = connection.prepareStatement(query.toString());
             }
 
-//            String query = "SELECT t.id, t.name, t.categoryId, t.dateTimeCreated, c.color AS colorHex " +
-//                    "FROM " + tableConnectionInfo.tableName + " t " +
-//                    "LEFT JOIN color c ON c.id = t.colorId " +
-//                    "ORDER BY t.id " +
-//                    "LIMIT ? OFFSET ?";
-//
-//            preparedStatement = connection.prepareStatement(query);
-//            preparedStatement.setInt(1, top);
-//            preparedStatement.setInt(2, skip);
-
             ResultSet resultSet = preparedStatement.executeQuery();
 
             ArrayList<Tag> fetchResult = new ArrayList<>();
@@ -251,39 +244,5 @@ public class TableTag {
             try { connection.close(); } catch (Exception e) { }
         }
     }
-
-//    public static String getTable(int skip, int top)
-//            throws JsonProcessingException, SQLException {
-//
-//       // String orderBy = "ORDER BY name DESC";
-//
-//        com.panikradius.sdms.ResultTableData resultTableData =
-//                DbHelper.getTableResultSet(tableConnectionInfo, skip, top, "");
-//
-//        if (resultTableData == null) {return "";}
-//        ResultSet resultSet = resultTableData.resultSet;
-//        if (resultSet == null) { return ""; }
-//
-//        ArrayList<Tag> fetchResult = new ArrayList<Tag>();
-//        while (resultSet.next()) {
-//            fetchResult.add(
-//                    new Tag(
-//                            Integer.parseInt(resultSet.getString(1)),
-//                            resultSet.getString(2),
-//                            Integer.parseInt(resultSet.getString(3)),
-//                            Integer.parseInt(resultSet.getString(4)),
-//                            Timestamp.valueOf(resultSet.getString(5))
-//            ));
-//        }
-//
-//        String items = new ObjectMapper().writer().withDefaultPrettyPrinter().
-//                writeValueAsString(fetchResult);
-//
-//        String result = "{ " +
-//                "\"items\": " + items + "," +
-//                "\"totalCount\": " + resultTableData.count +
-//                "}";
-//        return result;
-//    }
 }
 

@@ -6,6 +6,7 @@ import com.panikradius.sdms.Logger;
 import com.panikradius.sdms.db.DbConnection;
 import com.panikradius.sdms.db.TableDocument;
 import com.panikradius.sdms.db.TableDocumentTag;
+import com.panikradius.sdms.db.TableTagKeyword;
 import com.panikradius.sdms.models.DocumentTag;
 import com.panikradius.sdms.models.Log;
 import jakarta.ws.rs.Consumes;
@@ -16,9 +17,14 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.glassfish.jersey.media.multipart.FormDataParam;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -27,6 +33,9 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 @Path("document")
 public class Document {
@@ -57,7 +66,7 @@ public class Document {
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.TEXT_PLAIN)
     public Response post(
-            @FormDataParam("file") InputStream fileStream,
+            @FormDataParam("file") InputStream inputStream,
             @FormDataParam("file") FormDataContentDisposition fileInfo,
             @FormDataParam("comment") String comment,
             @FormDataParam("tagIds") String tagIds,
@@ -72,6 +81,15 @@ public class Document {
             Logger.log(msg, Log.LogLevel.INFO);
             return Response.serverError().build();
         }
+
+        byte [] fileBytes = getFileBytes(inputStream);
+        if (fileBytes == null) {
+            String msg = "File stream read error";
+            Logger.log(msg, Log.LogLevel.ERROR);
+            return Response.serverError().entity(msg).build();
+        }
+
+        Set<Integer> matchedTagIds = getMatchedTagIds(fileBytes);
 
         try {
             com.panikradius.sdms.models.Document document = new com.panikradius.sdms.models.Document();
@@ -91,18 +109,22 @@ public class Document {
                 throw new Exception();
             }
 
+            Set<Integer> allTagIds = new HashSet<>();
             if (!tagIds.equals("")) {
                 String[] parts = tagIds.split(",");
-                int[] tagIdArray = new int[parts.length];
-                for (int i = 0; i<parts.length; i++) {
-                    tagIdArray[i] = Integer.parseInt(parts[i]);
-                }
 
-                for (int i = 0; i< tagIdArray.length; i++) {
-                    TableDocumentTag.postPreparedStatement(
-                            connection,
-                            new DocumentTag(documentID, tagIdArray[i]));
+                for (int i = 0; i<parts.length; i++) {
+                    allTagIds.add(Integer.parseInt(parts[i]));
                 }
+            }
+
+            allTagIds.addAll(matchedTagIds);
+
+            Integer[] allTagIdsArray = allTagIds.toArray(new Integer[0]);
+            for (int i = 0; i< allTagIdsArray.length; i++) {
+                TableDocumentTag.postPreparedStatement(
+                        connection,
+                        new DocumentTag(documentID, allTagIdsArray[i]));
             }
 
             connection.commit();
@@ -111,7 +133,7 @@ public class Document {
         } catch (Exception e) {
             String msg = "Database error";
             System.out.println(e.getMessage());
-            Logger.log(msg, Log.LogLevel.ERROR);
+            Logger.log(msg + "//" + e.getMessage(), Log.LogLevel.ERROR);
             return Response.serverError().entity(msg).build();
         }
 
@@ -121,7 +143,7 @@ public class Document {
 
         String path = App.pathToDms + fileName;
         try {
-            Files.copy(fileStream, Paths.get(path));
+            Files.write(Paths.get(path), fileBytes);
         } catch (IOException e) {
             // TODO exception file already exists
             String msg = "File write error: " + fileName;
@@ -133,5 +155,40 @@ public class Document {
         String msg = "new document archived --> " + fileName + " --> savetimeDB=" + timeDB + " / savetimeIO=" + timeIO;
         Logger.log(msg, Log.LogLevel.INFO);
         return Response.ok().build();
+    }
+
+    private static byte[] getFileBytes(InputStream inputStream){
+
+        byte[] fileBytes = null;
+        try {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int read;
+            while ((read = inputStream.read(chunk)) != -1) {
+                buffer.write(chunk, 0, read);
+            }
+            fileBytes = buffer.toByteArray();
+        } catch (IOException e) {}
+
+        return fileBytes;
+    }
+
+    private static Set<Integer> getMatchedTagIds(byte [] fileBytes) {
+        Set<Integer> matchedTagIds = new HashSet<>();
+        try {
+            PDDocument doc = PDDocument.load(new ByteArrayInputStream(fileBytes));
+            String text = new PDFTextStripper().getText(doc).toLowerCase();
+            doc.close();
+
+            Map<String, Integer> keywordToTagId = TableTagKeyword.getKeywordToTagIdMap();
+            for (Map.Entry<String, Integer> entry : keywordToTagId.entrySet()) {
+                if (text.contains(entry.getKey())) {
+                    matchedTagIds.add(entry.getValue());
+                }
+            }
+        } catch (Exception e) {
+            Logger.log("PDF keyword extraction failed: " + e.getMessage(), Log.LogLevel.ERROR);
+        }
+        return matchedTagIds;
     }
 }

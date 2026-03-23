@@ -124,7 +124,9 @@ public class TableDocument {
 
         Connection connection = null;
         PreparedStatement preparedStatement = null;
+        PreparedStatement countStatement = null;
         Map<Integer, Document> documentMap = new LinkedHashMap<>();
+        int totalCount = 0;
 
         try {
             connection = DriverManager.getConnection(
@@ -150,29 +152,55 @@ public class TableDocument {
                 whereClause.append(")");
             }
 
-            String query = "SELECT " +
-                    "d.id, d.fileName, d.comment, d.dateDocument, d.dateTimeArchived, " +
-                    "t.id AS tagId, t.name AS tagName, c.color AS tagColor " +
+            String countQuery = "SELECT COUNT(DISTINCT d.id) " +
                     "FROM document d " +
                     "LEFT JOIN document_tag dt ON dt.documentID = d.id " +
-                    "LEFT JOIN tag t ON t.id = dt.tagID " +
-                    "LEFT JOIN color c ON c.id = t.colorId " +
-                    whereClause +
-                    "ORDER BY d.id ";
+                    whereClause;
 
-            if (top != 0) {
-                query += "LIMIT ? OFFSET ?";
-                params.add(top);
-                params.add(skip);
+            countStatement = connection.prepareStatement(countQuery);
+            for (int i = 0; i < params.size(); i++) {
+                countStatement.setObject(i + 1, params.get(i));
             }
 
-            preparedStatement = connection.prepareStatement(query);
-            for (int i = 0; i < params.size(); i++) {
-                preparedStatement.setObject(i + 1, params.get(i));
+            ResultSet countResult = countStatement.executeQuery();
+            if (countResult.next()) {
+                totalCount = countResult.getInt(1);
+            }
+
+            // ── Haupt Query mit Subquery für korrektes LIMIT ─────
+            List<Object> mainParams = new ArrayList<>(params);
+
+            StringBuilder mainQuery = new StringBuilder();
+            mainQuery.append("SELECT d.id, d.fileName, d.comment, d.dateDocument, d.dateTimeArchived, ");
+            mainQuery.append("t.id AS tagId, t.name AS tagName, c.color AS tagColor ");
+            mainQuery.append("FROM (SELECT * FROM document d ");
+
+            if (whereClause.length() == 0) {
+                mainQuery.append("LEFT JOIN document_tag dt ON dt.documentID = d.id ");
+                mainQuery.append(whereClause);
+                mainQuery.append(" GROUP BY d.id ");
+            }
+
+            mainQuery.append("ORDER BY id ");
+
+            if (top != 0) {
+                mainQuery.append("LIMIT ? OFFSET ?");
+                mainParams.add(top);
+                mainParams.add(skip);
+            }
+
+            mainQuery.append(") d ");
+            mainQuery.append("LEFT JOIN document_tag dt ON dt.documentID = d.id ");
+            mainQuery.append("LEFT JOIN tag t ON t.id = dt.tagID ");
+            mainQuery.append("LEFT JOIN color c ON c.id = t.colorId ");
+            mainQuery.append("ORDER BY d.id");
+
+            preparedStatement = connection.prepareStatement(mainQuery.toString());
+            for (int i = 0; i < mainParams.size(); i++) {
+                preparedStatement.setObject(i + 1, mainParams.get(i));
             }
 
             ResultSet resultSet = preparedStatement.executeQuery();
-
 
             while (resultSet.next()) {
                 int docId = resultSet.getInt("id");
@@ -200,17 +228,21 @@ public class TableDocument {
 
         } catch (Exception e) {
         } finally {
-            try { preparedStatement.close(); } catch (Exception e) { /* Ignored */ }
-            try { connection.close(); } catch (Exception e) { /* Ignored */ }
+            try { if (countStatement != null) countStatement.close(); } catch (Exception e) { }
+            try { if (preparedStatement != null) preparedStatement.close(); } catch (Exception e) { }
+            try { if (connection != null) connection.close(); } catch (Exception e) { }
         }
 
-        String items = new ObjectMapper().writer().withDefaultPrettyPrinter().writeValueAsString(documentMap.values());
+        int totalPages = top != 0 ? (int) Math.ceil((double) totalCount / top) : 1;
 
-        String result = "{ " +
+        String items = new ObjectMapper().writer().withDefaultPrettyPrinter()
+                .writeValueAsString(documentMap.values());
+
+        return "{ " +
                 "\"items\": " + items + "," +
-                "\"totalCount\": " + documentMap.size() +
+                "\"totalCount\": " + totalCount + "," +
+                "\"totalPages\": " + totalPages +
                 "}";
-        return result;
     }
 
     public static boolean isAlreadyExisting(String fileName) {
