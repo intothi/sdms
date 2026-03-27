@@ -12,6 +12,7 @@ import com.panikradius.sdms.models.DocumentTag;
 import com.panikradius.sdms.models.Log;
 import com.panikradius.sdms.models.TagKeyword;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -64,6 +65,51 @@ public class Document {
     @Produces("application/pdf")
     public Response getSingle(@QueryParam("fileName") String fileName) {
         return TableDocument.get(fileName);
+    }
+
+    @DELETE
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response delete(@QueryParam("id") int id) {
+
+        Connection connection = null;
+        try {
+            connection = DriverManager.getConnection(
+                    DbConnection.DB_URL,
+                    DbConnection.USER,
+                    DbConnection.PW);
+
+            connection.setAutoCommit(false);
+
+            String fileName = TableDocument.getFileNameById(connection, id);
+            if (fileName == null) {
+                Logger.log("document delete requested -> fileName not found in Db", Log.LogLevel.ERROR);
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+
+            TableDocumentTag.deleteByDocumentId(connection, id);
+            TableDocument.deleteById(connection, id);
+
+            connection.commit();
+
+            if (!Files.deleteIfExists(Paths.get(App.pathToDms + fileName))) {
+                String msg = "The document has been deleted from the database " +
+                        "but could not be found in the file system -> orphaned entry: " + fileName;
+
+                Logger.log(msg, Log.LogLevel.INFO);
+            }
+
+
+        } catch (Exception e) {
+            try { if (connection != null) connection.rollback(); } catch (Exception ignored) {}
+            String msg = "Delete error: " + e.getMessage();
+            Logger.log(msg, Log.LogLevel.ERROR);
+            return Response.serverError().entity(msg).build();
+        } finally {
+            try { if (connection != null) connection.close(); } catch (Exception ignored) {}
+        }
+
+        Logger.log("document deleted --> id=" + id, Log.LogLevel.INFO);
+        return Response.ok().build();
     }
 
     @POST

@@ -60,8 +60,11 @@ public class TableDocument {
         }
     }
 
-    public static void deleteById(int id) {
-        DbHelper.deleteById(tableConnectionInfo, id);
+    public static void deleteById(Connection connection, int id) throws SQLException {
+        PreparedStatement ps = connection.prepareStatement(
+                "DELETE FROM " + tableConnectionInfo.tableName + " WHERE id = ?");
+        ps.setInt(1, id);
+        ps.executeUpdate();
     }
 
     public static int post(Connection connection, Document document) {
@@ -252,5 +255,17 @@ public class TableDocument {
         }
 
         return false;
+    }
+
+    public static String getFileNameById(Connection connection, int id) throws SQLException {
+        PreparedStatement preparedStatement = connection.prepareStatement(
+                "SELECT fileName" + " FROM " + tableConnectionInfo.tableName
+                        + " WHERE id = ?");
+
+        preparedStatement.setInt(1, id);
+        ResultSet resultSet = preparedStatement.executeQuery();
+
+        if (resultSet.next()) { return resultSet.getString("fileName"); }
+        return null;
     }
 }

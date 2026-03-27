@@ -6,6 +6,7 @@ import com.panikradius.sdms.models.Tag;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 
 public class TableDocumentTag {
 
@@ -50,5 +51,14 @@ public class TableDocumentTag {
         } finally {
             try { preparedStatement.close(); } catch (Exception e) { /* Ignored */ }
         }
+    }
+
+    public static void deleteByDocumentId(Connection connection, int documentId) throws SQLException {
+        PreparedStatement preparedStatement = connection.prepareStatement(
+                "DELETE FROM " + tableConnectionInfo.tableName
+                        + " WHERE documentID = ?");
+
+        preparedStatement.setInt(1, documentId);
+        preparedStatement.executeUpdate();
     }
 }
