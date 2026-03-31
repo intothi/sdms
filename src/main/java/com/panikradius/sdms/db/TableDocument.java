@@ -3,8 +3,10 @@ package com.panikradius.sdms.db;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.panikradius.sdms.App;
+import com.panikradius.sdms.Logger;
 import com.panikradius.sdms.ResultTableData;
 import com.panikradius.sdms.models.Document;
+import com.panikradius.sdms.models.Log;
 import com.panikradius.sdms.models.Tag;
 import jakarta.ws.rs.core.Response;
 
@@ -38,6 +40,7 @@ public class TableDocument {
             + "fileName VARCHAR (255) NOT NULL, "
             + "comment VARCHAR (4095) NOT NULL, "
             + "dateDocument DATE, "
+            + "dueDate DATE, "
             + "dateTimeArchived DATETIME, "
             + "PRIMARY KEY (id)"
             + ")";
@@ -74,14 +77,14 @@ public class TableDocument {
         try {
 
             String query = "INSERT INTO " + tableConnectionInfo.tableName +
-                    " (fileName, comment, dateDocument, dateTimeArchived) " +
-                    " VALUES (?,?,?,?)";
+                    " (fileName, comment, dateDocument, dueDate, dateTimeArchived) " +
+                    " VALUES (?,?,?,?,NOW())";
 
             preparedStatement = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
             preparedStatement.setString(1, document.fileName);
             preparedStatement.setString(2, document.comment);
             preparedStatement.setDate(3, document.dateDocument);
-            preparedStatement.setTimestamp(4, new java.sql.Timestamp(System.currentTimeMillis()));
+            preparedStatement.setDate(4, document.dueDate);
             preparedStatement.executeUpdate();
             ResultSet resultSet = preparedStatement.getGeneratedKeys();
             if (resultSet.next()) {
@@ -100,7 +103,9 @@ public class TableDocument {
             int skip,
             int top,
             String name,
-            String[] tagIds ) throws JsonProcessingException {
+            String[] tagIds,
+            String sortBy,
+            String sortDir) throws JsonProcessingException {
 
         Connection connection = null;
         PreparedStatement preparedStatement = null;
@@ -114,28 +119,33 @@ public class TableDocument {
                     tableConnectionInfo.user,
                     tableConnectionInfo.pw);
 
+            // ── WHERE Clause nur auf document-Ebene ──────────────
             StringBuilder whereClause = new StringBuilder();
             List<Object> params = new ArrayList<>();
 
             if (!name.isEmpty()) {
-                whereClause.append(" WHERE LOWER(d.fileName) LIKE LOWER(?) ");
+                whereClause.append(" WHERE LOWER(fileName) LIKE LOWER(?) ");
                 params.add("%" + name + "%");
             }
 
+            // Tag-Filter als IN-Subquery auf document_tag
             if (tagIds.length > 0) {
-                whereClause.append((whereClause.length() == 0) ? " WHERE " : " AND ");
-                whereClause.append("dt.tagID IN (");
+                whereClause.append(whereClause.length() == 0 ? " WHERE " : " AND ");
+                whereClause.append("id IN (SELECT documentID FROM document_tag WHERE tagID IN (");
                 for (int i = 0; i < tagIds.length; i++) {
                     whereClause.append(i == 0 ? "?" : ",?");
                     params.add(tagIds[i]);
                 }
-                whereClause.append(")");
+                whereClause.append("))");
             }
 
-            String countQuery = "SELECT COUNT(DISTINCT d.id) " +
-                    "FROM document d " +
-                    "LEFT JOIN document_tag dt ON dt.documentID = d.id " +
-                    whereClause;
+            StringBuilder sortClause = new StringBuilder();
+            if (!sortBy.isEmpty()) {
+                sortClause.append(" ORDER BY " + sortBy + " " + sortDir);
+            }
+
+            // ── COUNT Query ───────────────────────────────────────
+            String countQuery = "SELECT COUNT(*) FROM document" + whereClause;
 
             countStatement = connection.prepareStatement(countQuery);
             for (int i = 0; i < params.size(); i++) {
@@ -147,21 +157,17 @@ public class TableDocument {
                 totalCount = countResult.getInt(1);
             }
 
-            // ── Haupt Query mit Subquery für korrektes LIMIT ─────
+
             List<Object> mainParams = new ArrayList<>(params);
 
             StringBuilder mainQuery = new StringBuilder();
-            mainQuery.append("SELECT d.id, d.fileName, d.comment, d.dateDocument, d.dateTimeArchived, ");
+            mainQuery.append("SELECT d.id, d.fileName, d.comment, d.dateDocument, d.dueDate,  d.dateTimeArchived, ");
             mainQuery.append("t.id AS tagId, t.name AS tagName, c.color AS tagColor ");
-            mainQuery.append("FROM (SELECT * FROM document d ");
-
-            if (whereClause.length() == 0) {
-                mainQuery.append("LEFT JOIN document_tag dt ON dt.documentID = d.id ");
-                mainQuery.append(whereClause);
-                mainQuery.append(" GROUP BY d.id ");
-            }
-
-            mainQuery.append("ORDER BY id ");
+            mainQuery.append("FROM (SELECT * FROM document");
+            mainQuery.append(whereClause);
+            //mainQuery.append(" ORDER BY id ");
+            mainQuery.append(sortClause);
+            mainQuery.append(" ");
 
             if (top != 0) {
                 mainQuery.append("LIMIT ? OFFSET ?");
@@ -173,7 +179,8 @@ public class TableDocument {
             mainQuery.append("LEFT JOIN document_tag dt ON dt.documentID = d.id ");
             mainQuery.append("LEFT JOIN tag t ON t.id = dt.tagID ");
             mainQuery.append("LEFT JOIN color c ON c.id = t.colorId ");
-            mainQuery.append("ORDER BY d.id");
+            //mainQuery.append("ORDER BY d.id");
+            mainQuery.append(sortClause);
 
             preparedStatement = connection.prepareStatement(mainQuery.toString());
             for (int i = 0; i < mainParams.size(); i++) {
@@ -186,12 +193,15 @@ public class TableDocument {
                 int docId = resultSet.getInt("id");
 
                 if (!documentMap.containsKey(docId)) {
-                    Document document = new Document();
-                    document.id = docId;
-                    document.fileName = resultSet.getString("fileName");
-                    document.comment = resultSet.getString("comment");
-                    document.dateDocument = resultSet.getDate("dateDocument");
-                    document.dateTimeArchived = resultSet.getTimestamp("dateTimeArchived");
+                    Document document = new Document(
+                            docId,
+                            resultSet.getString("fileName"),
+                            resultSet.getString("comment"),
+                            resultSet.getDate("dateDocument"),
+                            resultSet.getDate("dueDate"),
+                            resultSet.getTimestamp("dateTimeArchived")
+                    );
+
                     document.tags = new ArrayList<Tag>();
                     documentMap.put(docId, document);
                 }
@@ -207,6 +217,7 @@ public class TableDocument {
             }
 
         } catch (Exception e) {
+
         } finally {
             try { if (countStatement != null) countStatement.close(); } catch (Exception e) { }
             try { if (preparedStatement != null) preparedStatement.close(); } catch (Exception e) { }

@@ -1,10 +1,8 @@
 package com.panikradius.sdms.db;
 
 import com.panikradius.sdms.models.DocumentTag;
-import com.panikradius.sdms.models.Tag;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 

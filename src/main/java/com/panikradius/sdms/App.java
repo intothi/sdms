@@ -7,6 +7,7 @@ import com.panikradius.sdms.db.TableColor;
 import com.panikradius.sdms.db.TableDocument;
 import com.panikradius.sdms.db.TableDocumentTag;
 import com.panikradius.sdms.db.TableLog;
+import com.panikradius.sdms.db.TableScannerConfig;
 import com.panikradius.sdms.db.TableTag;
 import com.panikradius.sdms.db.TableTagKeyword;
 import com.sun.net.httpserver.HttpServer;
@@ -17,6 +18,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 import java.io.File;
 import java.net.URI;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -91,6 +93,7 @@ public class App {
                     DbConnection.PW);
             connection.setAutoCommit(false);
 
+            TableScannerConfig.insertDefaultValues(connection);
             TableColor.insertDefaultColors(connection);
             TableCategory.insertDefaultCategories(connection);
             TableTag.insertDefaultTags(connection);
@@ -105,6 +108,7 @@ public class App {
     private static void buildTables() {
         System.out.println("creating tables");
         TableLog.buildTable();
+        TableScannerConfig.buildTable();
         TableColor.buildTable();
         TableCategory.buildTable();
         TableTag.buildTable();

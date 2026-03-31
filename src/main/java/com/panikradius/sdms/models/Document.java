@@ -13,6 +13,7 @@ public class Document {
 
     //TODO Filesize
     public Date dateDocument;
+    public Date dueDate;
     public Timestamp dateTimeArchived;
     public List<Tag> tags = new ArrayList<Tag>();
 
@@ -24,12 +25,14 @@ public class Document {
             String fileName,
             String comment,
             Date dateDocument,
+            Date dueDate,
             Timestamp dateTimeArchived) {
 
         this.id = id;
         this.fileName = fileName;
         this.comment = comment;
         this.dateDocument = dateDocument;
+        this.dueDate = dueDate;
         this.dateTimeArchived = dateTimeArchived;
     }
 
@@ -37,11 +40,13 @@ public class Document {
             String fileName,
             String comment,
             Date dateDocument,
+            Date dueDate,
             Timestamp dateTimeArchived) {
 
         this.fileName = fileName;
         this.comment = comment;
         this.dateDocument = dateDocument;
+        this.dueDate = dueDate;
         this.dateTimeArchived = dateTimeArchived;
     }
 

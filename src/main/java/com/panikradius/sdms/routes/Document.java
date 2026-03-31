@@ -53,12 +53,14 @@ public class Document {
             @QueryParam("skip") int skip,
             @QueryParam("top") int top,
             @QueryParam("name") String name,
-            @QueryParam("tags") String tags)
+            @QueryParam("tags") String tags,
+            @QueryParam("sortBy") String sortBy,
+            @QueryParam("sortDir") String sortDir)
             throws JsonProcessingException, SQLException {
 
         String[] parts = !tags.isEmpty() ? tags.split(",") : new String[0];
 
-        return TableDocument.getTable(skip, top, name, parts);
+        return TableDocument.getTable(skip, top, name, parts, sortBy, sortDir);
     }
 
     @GET
@@ -121,7 +123,8 @@ public class Document {
             @FormDataParam("file") FormDataContentDisposition fileInfo,
             @FormDataParam("comment") String comment,
             @FormDataParam("tagIds") String tagIds,
-            @FormDataParam("dateDocument") String dateDocument
+            @FormDataParam("dateDocument") String dateDocument,
+            @FormDataParam("dueDate") String dueDateString
     ) {
 
         long timeDB = System.nanoTime();
@@ -149,8 +152,11 @@ public class Document {
         Integer[] allTagIdsArray = allTagIds.toArray(new Integer[0]);
 
         Timestamp timestamp = new java.sql.Timestamp(System.currentTimeMillis());
-        String dateNameForFile = timestamp.toLocalDateTime().
-                format(java.time.format.DateTimeFormatter.ofPattern("yyyy_MM_dd"));
+        String dateNameForFile = timestamp.toLocalDateTime()
+                .atZone(java.time.ZoneId.of("UTC"))
+                .withZoneSameInstant(java.time.ZoneId.of("Europe/Berlin"))
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd.HH.mm.ss"));
+
         String fileName;
 
         try {
@@ -168,11 +174,15 @@ public class Document {
                 return Response.serverError().build();
             }
 
+// TODO hier gehts weiter. Wie soll es sich verhalten, wenn dueDate leer ist? Date.valueOf schmeißt eine Exception
+
+            Date dueDate = dueDateString == null ? null : Date.valueOf(dueDateString);
 
             com.panikradius.sdms.models.Document document = new com.panikradius.sdms.models.Document(
                     fileName,
                     comment,
                     Date.valueOf(dateDocument),
+                    dueDate,
                     timestamp
             );
 
