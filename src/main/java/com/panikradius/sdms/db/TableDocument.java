@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.panikradius.sdms.App;
 import com.panikradius.sdms.models.Document;
+import com.panikradius.sdms.models.DocumentMeta;
 import com.panikradius.sdms.models.Tag;
 import jakarta.ws.rs.core.Response;
 
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -309,6 +311,36 @@ public class TableDocument {
                 "\"totalCount\": " + totalCount + "," +
                 "\"totalPages\": " + totalPages +
                 "}";
+    }
+
+    public static void updateMeta(int id, DocumentMeta meta) throws Exception {
+        Connection connection = null;
+        PreparedStatement preparedStatement = null;
+        try {
+            connection = DriverManager.getConnection(
+                    tableConnectionInfo.dbConnectionURL,
+                    tableConnectionInfo.user,
+                    tableConnectionInfo.pw);
+
+            String query = "UPDATE " + tableConnectionInfo.tableName +
+                    " SET comment = ?, dateDocument = ?, dueDate = ?, parentId = ? WHERE id = ?";
+
+            preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setString(1, meta.comment);
+            preparedStatement.setDate(2, meta.dateDocument != null ? Date.valueOf(meta.dateDocument) : null);
+            preparedStatement.setDate(3, meta.dueDate != null ? Date.valueOf(meta.dueDate) : null);
+            if (meta.parentId == null) {
+                preparedStatement.setNull(4, java.sql.Types.INTEGER);
+            } else {
+                preparedStatement.setInt(4, meta.parentId);
+            }
+            preparedStatement.setInt(5, id);
+            preparedStatement.executeUpdate();
+
+        } finally {
+            try { if (preparedStatement != null) preparedStatement.close(); } catch (Exception e) {}
+            try { if (connection != null) connection.close(); } catch (Exception e) {}
+        }
     }
 
     public static boolean isAlreadyExisting(String fileName) {

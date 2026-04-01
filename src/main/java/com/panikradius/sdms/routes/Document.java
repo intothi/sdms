@@ -15,6 +15,7 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
@@ -315,6 +316,22 @@ public class Document {
             Logger.log("PDF keyword extraction failed: " + e.getMessage(), Log.LogLevel.ERROR);
         }
         return matchedTagIds;
+    }
+
+    @PUT
+    @Path("/meta")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response updateMeta(
+            @QueryParam("id") int id,
+            com.panikradius.sdms.models.DocumentMeta meta) {
+        try {
+            TableDocument.updateMeta(id, meta);
+            return Response.ok().build();
+        } catch (Exception e) {
+            String msg = "Document meta update error: " + e.getMessage();
+            Logger.log(msg, Log.LogLevel.ERROR);
+            return Response.serverError().entity(msg).build();
+        }
     }
 
     private static String replaceUmlauts(String input) {
