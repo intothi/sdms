@@ -69,6 +69,20 @@ public class Document {
         return TableDocument.get(fileName);
     }
 
+    @GET
+    @Path("/thread")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getThread(@QueryParam("id") int id) throws JsonProcessingException {
+        try {
+            String result = TableDocument.getThread(id);
+            return Response.ok(result).build();
+        } catch (Exception e) {
+            String msg = "Thread fetch error: " + e.getMessage();
+            Logger.log(msg, Log.LogLevel.ERROR);
+            return Response.serverError().entity(msg).build();
+        }
+    }
+
     @DELETE
     @Produces(MediaType.TEXT_PLAIN)
     public Response delete(@QueryParam("id") int id) {

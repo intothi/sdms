@@ -122,6 +122,55 @@ public class TableDocument {
         return documentID;
     }
 
+    public static String getThread(int id) throws Exception {
+        Connection connection = null;
+        PreparedStatement preparedStatement = null;
+        List<com.panikradius.sdms.models.Document> documentArrayList = new ArrayList<>();
+
+        try {
+            connection = DriverManager.getConnection(
+                    tableConnectionInfo.dbConnectionURL,
+                    tableConnectionInfo.user,
+                    tableConnectionInfo.pw);
+
+            String query =
+                    "WITH RECURSIVE thread AS (" +
+                            "  SELECT * FROM " + tableConnectionInfo.tableName + " WHERE id = ? " +
+                            "  UNION ALL " +
+                            "  SELECT d.* FROM " + tableConnectionInfo.tableName + " d " +
+                            "  INNER JOIN thread t ON d.parentId = t.id " +
+                            ") " +
+                            "SELECT * FROM thread WHERE id != ?";
+
+            preparedStatement = connection.prepareStatement(query);
+            preparedStatement.setInt(1, id);
+            preparedStatement.setInt(2, id);
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            while (resultSet.next()) {
+                com.panikradius.sdms.models.Document document = new com.panikradius.sdms.models.Document(
+                        resultSet.getInt("id"),
+                        resultSet.getString("fileName"),
+                        resultSet.getString("comment"),
+                        resultSet.getDate("dateDocument"),
+                        resultSet.getDate("dueDate"),
+                        resultSet.getTimestamp("dateTimeArchived")
+                );
+                document.parentId = resultSet.getInt("parentId");
+                document.countPages = resultSet.getInt("countPages");
+                document.fileSize = resultSet.getLong("fileSize");
+                documentArrayList.add(document);
+            }
+
+        } finally {
+            try { if (preparedStatement != null) preparedStatement.close(); } catch (Exception e) {}
+            try { if (connection != null) connection.close(); } catch (Exception e) {}
+        }
+
+        return new ObjectMapper().writer().withDefaultPrettyPrinter().writeValueAsString(documentArrayList);
+    }
+
     public static String getTable(
             int skip,
             int top,
