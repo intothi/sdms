@@ -142,7 +142,7 @@ public class Document {
             @FormDataParam("parentId") Integer parentId
     ) {
 
-        long timeDB = System.nanoTime();
+        long timeStart = System.nanoTime();
 
         byte [] fileBytes = getFileBytes(inputStream);
         if (fileBytes == null) {
@@ -253,9 +253,8 @@ public class Document {
             return Response.serverError().entity(msg).build();
         }
 
-        timeDB = (System.nanoTime() - timeDB) / 1000000;
 
-        long timeIO = System.nanoTime();
+
 
         String path = App.pathToDms + fileName;
         try {
@@ -265,9 +264,9 @@ public class Document {
             Logger.log(msg, Log.LogLevel.ERROR);
             return Response.serverError().entity(msg).build();
         }
-        timeIO = (System.nanoTime() - timeIO) / 1000000;
 
-        String msg = "new document archived --> " + fileName + " --> savetimeDB=" + timeDB + " / savetimeIO=" + timeIO;
+        double timeEnd = (System.nanoTime() - timeStart) / 1_000_000_000.0;
+        String msg = "new document archived --> " + fileName + " --> savetime=" + timeEnd;
         Logger.log(msg, Log.LogLevel.INFO);
         return Response.ok().build();
     }
@@ -327,6 +326,7 @@ public class Document {
                 .replace("Ö", "Oe")
                 .replace("Ü", "Ue")
                 .replace("ß", "ss")
-                .replace("/","_");
+                .replace("/","_")
+                .replace(" ", "_");
     }
 }

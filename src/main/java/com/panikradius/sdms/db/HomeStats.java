@@ -74,6 +74,30 @@ public class HomeStats {
             long diskFree  = dmsDir.getUsableSpace();
             long diskUsed  = diskTotal - diskFree;
 
+            // RAM
+            long ramTotal = 0, ramUsed = 0, ramFree = 0;
+            ProcessBuilder pbRam = new ProcessBuilder("free", "-k");
+            pbRam.redirectErrorStream(true);
+            Process processRam = pbRam.start();
+            BufferedReader readerRam = new BufferedReader(new InputStreamReader(processRam.getInputStream()));
+            String ramLine;
+            int ramLineCount = 0;
+            while ((ramLine = readerRam.readLine()) != null) {
+                ramLineCount++;
+                if (ramLineCount == 2) {
+                    String[] parts = ramLine.trim().split("\\s+");
+                    ramTotal = Long.parseLong(parts[1]) * 1024;
+                    ramUsed  = Long.parseLong(parts[2]) * 1024;
+                    ramFree  = Long.parseLong(parts[3]) * 1024;
+                }
+            }
+            processRam.waitFor();
+
+            // JVM
+            Runtime runtime = Runtime.getRuntime();
+            long jvmUsed  = runtime.totalMemory() - runtime.freeMemory();
+            long jvmTotal = runtime.maxMemory();
+
             // Letztes Backup
             // TODO: implementieren sobald backup Tabelle existiert
             String lastBackup = null;
@@ -85,6 +109,11 @@ public class HomeStats {
             result.put("diskTotal",      diskTotal);
             result.put("diskUsed",       diskUsed);
             result.put("diskFree",       diskFree);
+            result.put("ramTotal",       ramTotal);
+            result.put("ramUsed",        ramUsed);
+            result.put("ramFree",        ramFree);
+            result.put("jvmUsed",        jvmUsed);
+            result.put("jvmTotal",       jvmTotal);
             result.put("lastBackup",     lastBackup);
 
             return new ObjectMapper().writer().withDefaultPrettyPrinter().writeValueAsString(result);

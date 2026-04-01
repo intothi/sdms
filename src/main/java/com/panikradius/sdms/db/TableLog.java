@@ -75,9 +75,9 @@ public class TableLog {
         com.panikradius.sdms.ResultTableData resultTableData =
                 DbHelper.getTableResultSet(tableConnectionInfo, skip, top, orderBy);
 
-        if (resultTableData == null) {return "";}
+        if (resultTableData == null) { return "{\"items\":[],\"totalCount\":0}"; }
         ResultSet resultSet = resultTableData.resultSet;
-        if (resultSet == null) { return ""; }
+        if (resultSet == null) { return "{\"items\":[],\"totalCount\":0}"; }
 
         ArrayList<Log> fetchResult = new ArrayList<Log>();
         while (resultSet.next()) {
