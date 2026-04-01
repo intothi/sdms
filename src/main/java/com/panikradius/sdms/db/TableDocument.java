@@ -3,10 +3,7 @@ package com.panikradius.sdms.db;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.panikradius.sdms.App;
-import com.panikradius.sdms.Logger;
-import com.panikradius.sdms.ResultTableData;
 import com.panikradius.sdms.models.Document;
-import com.panikradius.sdms.models.Log;
 import com.panikradius.sdms.models.Tag;
 import jakarta.ws.rs.core.Response;
 
@@ -14,13 +11,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
-import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,14 +30,25 @@ public class TableDocument {
             DbConnection.PW
     );
 
-    private static final String QUERY_CREATE =  "CREATE TABLE " + tableConnectionInfo.tableName + " ("
+    private static final String QUERY_CREATE = "CREATE TABLE " + tableConnectionInfo.tableName + " ("
             + "id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
-            + "fileName VARCHAR (255) NOT NULL, "
-            + "comment VARCHAR (4095) NOT NULL, "
+            + "fileName VARCHAR(255) NOT NULL, "
+            + "comment VARCHAR(4095) NOT NULL, "
             + "dateDocument DATE, "
             + "dueDate DATE, "
+            + "parentId INT UNSIGNED NULL, "
+            + "fileSize BIGINT UNSIGNED NULL, "
+            + "countPages INT UNSIGNED NULL, "
+            + "countWords INT UNSIGNED NULL, "
+            + "mimeType VARCHAR(127) NULL, "
+            + "ocrText MEDIUMTEXT NULL, "
+            + "language VARCHAR(31) NULL, "
+            + "checksum CHAR(64) NULL, "
+            + "deskewDone BOOLEAN NOT NULL DEFAULT FALSE, "
             + "dateTimeArchived DATETIME, "
-            + "PRIMARY KEY (id)"
+            + "PRIMARY KEY (id), "
+            + "CONSTRAINT fk_document_parent FOREIGN KEY (parentId) REFERENCES " + tableConnectionInfo.tableName + " (id) ON DELETE SET NULL, "
+            + "FULLTEXT INDEX idx_ocr_text (ocrText)"
             + ")";
 
     public static void buildTable() {
@@ -77,14 +83,31 @@ public class TableDocument {
         try {
 
             String query = "INSERT INTO " + tableConnectionInfo.tableName +
-                    " (fileName, comment, dateDocument, dueDate, dateTimeArchived) " +
-                    " VALUES (?,?,?,?,NOW())";
+                    " (fileName, comment, dateDocument, dueDate, parentId, fileSize, " +
+                    " countPages, countWords, mimeType, ocrText, language, checksum, deskewDone, dateTimeArchived) " +
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())";
 
             preparedStatement = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
             preparedStatement.setString(1, document.fileName);
             preparedStatement.setString(2, document.comment);
             preparedStatement.setDate(3, document.dateDocument);
             preparedStatement.setDate(4, document.dueDate);
+
+            if (document.parentId == null) {
+                preparedStatement.setNull(5, java.sql.Types.INTEGER);
+            } else {
+                preparedStatement.setInt(5, document.parentId);
+            }
+
+            preparedStatement.setLong(6, document.fileSize);
+            preparedStatement.setInt(7, document.countPages);
+            preparedStatement.setInt(8, document.countWords);
+            preparedStatement.setString(9, document.mimeType);
+            preparedStatement.setString(10, document.ocrText);
+            preparedStatement.setString(11, document.language);
+            preparedStatement.setString(12, document.checksum);
+            preparedStatement.setBoolean(13,document.deskewDone);
+
             preparedStatement.executeUpdate();
             ResultSet resultSet = preparedStatement.getGeneratedKeys();
             if (resultSet.next()) {
@@ -161,7 +184,7 @@ public class TableDocument {
             List<Object> mainParams = new ArrayList<>(params);
 
             StringBuilder mainQuery = new StringBuilder();
-            mainQuery.append("SELECT d.id, d.fileName, d.comment, d.dateDocument, d.dueDate,  d.dateTimeArchived, ");
+            mainQuery.append("SELECT d.id, d.fileName, d.comment, d.dateDocument, d.dueDate, d.dateTimeArchived, d.parentId, d.fileSize, d.countPages, ");
             mainQuery.append("t.id AS tagId, t.name AS tagName, c.color AS tagColor ");
             mainQuery.append("FROM (SELECT * FROM document");
             mainQuery.append(whereClause);
@@ -202,6 +225,9 @@ public class TableDocument {
                             resultSet.getTimestamp("dateTimeArchived")
                     );
 
+                    document.parentId = resultSet.getInt("parentId");
+                    document.fileSize = resultSet.getLong("fileSize");
+                    document.countPages = resultSet.getInt("countPages");
                     document.tags = new ArrayList<Tag>();
                     documentMap.put(docId, document);
                 }

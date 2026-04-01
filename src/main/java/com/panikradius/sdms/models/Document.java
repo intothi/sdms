@@ -10,10 +10,17 @@ public class Document {
     public int id;
     public String fileName;
     public String comment;
-
-    //TODO Filesize
     public Date dateDocument;
     public Date dueDate;
+    public Integer parentId;
+    public long fileSize;
+    public int countPages;
+    public int countWords;
+    public String mimeType;
+    public String ocrText;
+    public String language;
+    public String checksum;
+    public boolean deskewDone;
     public Timestamp dateTimeArchived;
     public List<Tag> tags = new ArrayList<Tag>();
 

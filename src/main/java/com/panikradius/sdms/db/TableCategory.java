@@ -45,6 +45,7 @@ public class TableCategory {
                 "Absender",
                 "Status",
                 "Person",
+                "Thema"
         };
 
         for (int i = 0; i < categories.length; i++) {

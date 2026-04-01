@@ -96,7 +96,7 @@ public class App {
             TableScannerConfig.insertDefaultValues(connection);
             TableColor.insertDefaultColors(connection);
             TableCategory.insertDefaultCategories(connection);
-            TableTag.insertDefaultTags(connection);
+            //TableTag.insertDefaultTags(connection);
 
             connection.commit();
             System.out.println("finished filling tables");

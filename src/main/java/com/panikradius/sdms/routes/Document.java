@@ -27,11 +27,11 @@ import org.glassfish.jersey.media.multipart.FormDataParam;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
@@ -124,7 +124,8 @@ public class Document {
             @FormDataParam("comment") String comment,
             @FormDataParam("tagIds") String tagIds,
             @FormDataParam("dateDocument") String dateDocument,
-            @FormDataParam("dueDate") String dueDateString
+            @FormDataParam("dueDate") String dueDateString,
+            @FormDataParam("parentId") Integer parentId
     ) {
 
         long timeDB = System.nanoTime();
@@ -174,8 +175,6 @@ public class Document {
                 return Response.serverError().build();
             }
 
-// TODO hier gehts weiter. Wie soll es sich verhalten, wenn dueDate leer ist? Date.valueOf schmeißt eine Exception
-
             Date dueDate = dueDateString == null ? null : Date.valueOf(dueDateString);
 
             com.panikradius.sdms.models.Document document = new com.panikradius.sdms.models.Document(
@@ -185,6 +184,33 @@ public class Document {
                     dueDate,
                     timestamp
             );
+
+            document.deskewDone = false;
+            document.parentId = parentId;
+            document.fileSize = fileBytes.length;
+            // NOTE(CT) if we want to add support for other file formats Tika seems to be the way to go
+            document.mimeType = "application/pdf";
+            // NOTE(CT) Lingua or tika for language recognition
+            document.language = "de";
+
+            // create checksum
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(fileBytes);
+            StringBuilder stringBuilder = new StringBuilder();
+            for (int i = 0; i < hash.length; i++) {
+                stringBuilder.append(String.format("%02x", hash[i]));
+            }
+            document.checksum = stringBuilder.toString();
+
+            PDDocument pdf = PDDocument.load(fileBytes);
+            document.countPages = pdf.getNumberOfPages();
+
+            PDFTextStripper stripper = new PDFTextStripper();
+            document.ocrText = stripper.getText(pdf);
+            pdf.close();
+
+            String trimmed = document.ocrText != null ? document.ocrText.trim() : "";
+            document.countWords = trimmed.isEmpty() ? 0 : trimmed.split("\\s+").length;
 
             Connection connection = DriverManager.getConnection(
                     DbConnection.DB_URL,
@@ -221,7 +247,6 @@ public class Document {
         try {
             Files.write(Paths.get(path), fileBytes);
         } catch (IOException e) {
-            // TODO exception file already exists
             String msg = "File write error: " + fileName;
             Logger.log(msg, Log.LogLevel.ERROR);
             return Response.serverError().entity(msg).build();
