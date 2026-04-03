@@ -56,7 +56,8 @@ public class HomeStats {
             // Fällige Dokumente in den nächsten 14 Tagen
             preparedStatementDue = connection.prepareStatement(
                     "SELECT id, fileName, dueDate FROM document " +
-                            "WHERE dueDate IS NOT NULL AND dueDate >= CURDATE() AND dueDate <= DATE_ADD(CURDATE(), INTERVAL 14 DAY) " +
+                            "WHERE dueDate IS NOT NULL AND dueDate <= DATE_ADD(CURDATE(), INTERVAL 14 DAY) " +
+                            "AND done = FALSE " +
                             "ORDER BY dueDate ASC"
             );
             ResultSet resultSetDue = preparedStatementDue.executeQuery();

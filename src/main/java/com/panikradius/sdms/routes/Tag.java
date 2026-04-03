@@ -39,11 +39,11 @@ public class Tag {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response post(com.panikradius.sdms.models.Tag tag) {
         //TODO TAG validation --> check for double entries
-        if (TableTag.isAlreadyExisting(tag)) {
-            String msg = "could not save tag with name: " + tag.name + " because it already exists";
-            Logger.log(msg, Log.LogLevel.INFO);
-            return Response.serverError().build();
-        }
+//        if (TableTag.isAlreadyExisting(tag)) {
+//            String msg = "could not save tag with name: " + tag.name + " because it already exists";
+//            Logger.log(msg, Log.LogLevel.INFO);
+//            return Response.serverError().build();
+//        }
 
         TableTag.postPreparedStatement(tag);
         return Response.ok().build();

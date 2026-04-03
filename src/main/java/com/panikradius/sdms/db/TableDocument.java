@@ -47,6 +47,7 @@ public class TableDocument {
             + "language VARCHAR(31) NULL, "
             + "checksum CHAR(64) NULL, "
             + "deskewDone BOOLEAN NOT NULL DEFAULT FALSE, "
+            + "done BOOLEAN NOT NULL DEFAULT FALSE, "
             + "dateTimeArchived DATETIME, "
             + "PRIMARY KEY (id), "
             + "CONSTRAINT fk_document_parent FOREIGN KEY (parentId) REFERENCES " + tableConnectionInfo.tableName + " (id) ON DELETE SET NULL, "
@@ -235,7 +236,7 @@ public class TableDocument {
             List<Object> mainParams = new ArrayList<>(params);
 
             StringBuilder mainQuery = new StringBuilder();
-            mainQuery.append("SELECT d.id, d.fileName, d.comment, d.dateDocument, d.dueDate, d.dateTimeArchived, d.parentId, d.fileSize, d.countPages, ");
+            mainQuery.append("SELECT d.id, d.fileName, d.comment, d.dateDocument, d.dueDate, d.dateTimeArchived, d.parentId, d.fileSize, d.countPages, d.done, ");
             mainQuery.append("t.id AS tagId, t.name AS tagName, c.color AS tagColor ");
             mainQuery.append("FROM (SELECT * FROM document");
             mainQuery.append(whereClause);
@@ -279,6 +280,7 @@ public class TableDocument {
                     document.parentId = resultSet.getInt("parentId");
                     document.fileSize = resultSet.getLong("fileSize");
                     document.countPages = resultSet.getInt("countPages");
+                    document.done = resultSet.getBoolean("done");
                     document.tags = new ArrayList<Tag>();
                     documentMap.put(docId, document);
                 }
@@ -335,6 +337,28 @@ public class TableDocument {
                 preparedStatement.setInt(4, meta.parentId);
             }
             preparedStatement.setInt(5, id);
+            preparedStatement.executeUpdate();
+
+        } finally {
+            try { if (preparedStatement != null) preparedStatement.close(); } catch (Exception e) {}
+            try { if (connection != null) connection.close(); } catch (Exception e) {}
+        }
+    }
+
+    public static void updateDone(int id, boolean done) throws Exception {
+        Connection connection = null;
+        PreparedStatement preparedStatement = null;
+        try {
+            connection = DriverManager.getConnection(
+                    tableConnectionInfo.dbConnectionURL,
+                    tableConnectionInfo.user,
+                    tableConnectionInfo.pw);
+
+            preparedStatement = connection.prepareStatement(
+                    "UPDATE " + tableConnectionInfo.tableName + " SET done = ? WHERE id = ?"
+            );
+            preparedStatement.setBoolean(1, done);
+            preparedStatement.setInt(2, id);
             preparedStatement.executeUpdate();
 
         } finally {

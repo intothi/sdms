@@ -267,7 +267,7 @@ public class Document {
         }
 
         double timeEnd = (System.nanoTime() - timeStart) / 1_000_000_000.0;
-        String msg = "new document archived --> " + fileName + " --> savetime=" + timeEnd;
+        String msg = "new document archived --> " + fileName + " --> savetime=" + String.format("%.2f", timeEnd)+" sec.";
         Logger.log(msg, Log.LogLevel.INFO);
         return Response.ok().build();
     }
@@ -332,6 +332,50 @@ public class Document {
             Logger.log(msg, Log.LogLevel.ERROR);
             return Response.serverError().entity(msg).build();
         }
+    }
+
+    @PUT
+    @Path("/done")
+    public Response toggleDone(@QueryParam("id") int id, @QueryParam("done") boolean done) {
+        try {
+            TableDocument.updateDone(id, done);
+            return Response.ok().build();
+        } catch (Exception e) {
+            String msg = "Document done update error: " + e.getMessage();
+            Logger.log(msg, Log.LogLevel.ERROR);
+            return Response.serverError().entity(msg).build();
+        }
+    }
+
+    @PUT
+    @Path("/tags")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response updateTags(@QueryParam("id") int id, com.panikradius.sdms.models.TagUpdateRequest body) {
+        Connection connection = null;
+        try {
+            connection = DriverManager.getConnection(
+                    DbConnection.DB_URL,
+                    DbConnection.USER,
+                    DbConnection.PW);
+
+            connection.setAutoCommit(false);
+
+            TableDocumentTag.deleteByDocumentId(connection, id);
+
+            for (int i = 0; i < body.tagIds.size(); i++) {
+                TableDocumentTag.postPreparedStatement(connection, new DocumentTag(id, body.tagIds.get(i)));
+            }
+
+            connection.commit();
+        } catch (Exception e) {
+            try { if (connection != null) connection.rollback(); } catch (Exception ignored) {}
+            String msg = "Tags update error: " + e.getMessage();
+            Logger.log(msg, Log.LogLevel.ERROR);
+            return Response.serverError().entity(msg).build();
+        } finally {
+            try { if (connection != null) connection.close(); } catch (Exception ignored) {}
+        }
+        return Response.ok().build();
     }
 
     private static String replaceUmlauts(String input) {

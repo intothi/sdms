@@ -21,6 +21,7 @@ public class Document {
     public String language;
     public String checksum;
     public boolean deskewDone;
+    public boolean done;
     public Timestamp dateTimeArchived;
     public List<Tag> tags = new ArrayList<Tag>();
 
