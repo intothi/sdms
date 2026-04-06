@@ -254,9 +254,6 @@ public class Document {
             return Response.serverError().entity(msg).build();
         }
 
-
-
-
         String path = App.pathToDms + fileName;
         try {
             Files.write(Paths.get(path), fileBytes);
@@ -357,16 +354,43 @@ public class Document {
                     DbConnection.DB_URL,
                     DbConnection.USER,
                     DbConnection.PW);
-
             connection.setAutoCommit(false);
 
-            TableDocumentTag.deleteByDocumentId(connection, id);
-
-            for (int i = 0; i < body.tagIds.size(); i++) {
-                TableDocumentTag.postPreparedStatement(connection, new DocumentTag(id, body.tagIds.get(i)));
+            String oldFileName = TableDocument.getFileNameById(connection, id);
+            if (oldFileName == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
             }
 
+            String timestamp = oldFileName.substring(0, 19);
+
+            Integer[] tagIdsArray = body.tagIds.toArray(new Integer[0]);
+            List<String> tagNames = TableTag.getNamesByIds(tagIdsArray);
+
+            StringBuilder fileNameBuilder = new StringBuilder(timestamp);
+            for (int i = 0; i < tagNames.size(); i++) {
+                fileNameBuilder.append("_").append(replaceUmlauts(tagNames.get(i)));
+            }
+            String newFileName = fileNameBuilder + ".pdf";
+
+            // First update Tags in DB
+            TableDocumentTag.deleteByDocumentId(connection, id);
+            for (int i = 0; i < tagIdsArray.length; i++) {
+                TableDocumentTag.postPreparedStatement(connection, new DocumentTag(id, tagIdsArray[i]));
+            }
+
+            // Second update filename in DB
+            TableDocument.updateFileName(connection, id, newFileName);
+
+            // Last update Filename on filesystem
+            java.nio.file.Path oldPath = Paths.get(App.pathToDms + oldFileName);
+            java.nio.file.Path newPath = Paths.get(App.pathToDms + newFileName);
+            Files.move(oldPath, newPath);
+
             connection.commit();
+
+            Logger.log("document renamed: " + oldFileName + " -> " + newFileName, Log.LogLevel.INFO);
+            return Response.ok().build();
+
         } catch (Exception e) {
             try { if (connection != null) connection.rollback(); } catch (Exception ignored) {}
             String msg = "Tags update error: " + e.getMessage();
@@ -375,7 +399,6 @@ public class Document {
         } finally {
             try { if (connection != null) connection.close(); } catch (Exception ignored) {}
         }
-        return Response.ok().build();
     }
 
     private static String replaceUmlauts(String input) {

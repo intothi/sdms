@@ -18,7 +18,6 @@ import org.glassfish.jersey.server.ResourceConfig;
 import java.io.File;
 import java.net.URI;
 import java.sql.Connection;
-import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.HashMap;

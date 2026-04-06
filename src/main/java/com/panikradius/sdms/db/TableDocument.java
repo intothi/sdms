@@ -410,4 +410,18 @@ public class TableDocument {
         if (resultSet.next()) { return resultSet.getString("fileName"); }
         return null;
     }
+
+    public static void updateFileName(Connection connection, int id, String newFileName) throws Exception {
+        PreparedStatement preparedStatement = null;
+        try {
+            preparedStatement = connection.prepareStatement(
+                    "UPDATE " + tableConnectionInfo.tableName + " SET fileName = ? WHERE id = ?"
+            );
+            preparedStatement.setString(1, newFileName);
+            preparedStatement.setInt(2, id);
+            preparedStatement.executeUpdate();
+        } finally {
+            try { if (preparedStatement != null) preparedStatement.close(); } catch (Exception e) {}
+        }
+    }
 }
