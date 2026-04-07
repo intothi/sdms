@@ -3,6 +3,7 @@ package com.panikradius.sdms.routes;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.panikradius.sdms.App;
 import com.panikradius.sdms.Logger;
+import com.panikradius.sdms.OcrService;
 import com.panikradius.sdms.db.DbConnection;
 import com.panikradius.sdms.db.TableDocument;
 import com.panikradius.sdms.db.TableDocumentTag;
@@ -21,11 +22,14 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import net.sourceforge.tess4j.Tesseract;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.glassfish.jersey.media.multipart.FormDataParam;
 
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -142,7 +146,6 @@ public class Document {
             @FormDataParam("dueDate") String dueDateString,
             @FormDataParam("parentId") Integer parentId
     ) {
-
         long timeStart = System.nanoTime();
 
         byte [] fileBytes = getFileBytes(inputStream);
@@ -152,20 +155,69 @@ public class Document {
             return Response.serverError().entity(msg).build();
         }
 
+        double timeEndGetFileBytes = (System.nanoTime() - timeStart) / 1_000_000_000.0;
+
+        PDDocument pdf = null;
+        try {
+            pdf = PDDocument.load(fileBytes);
+        } catch (IOException e) {
+            String msg = "PDF load error: " + e.getMessage();
+            Logger.log(msg, Log.LogLevel.ERROR);
+            return Response.serverError().entity(msg).build();
+        }
+
+        double timeEndLoadPfd = (System.nanoTime() - timeStart) / 1_000_000_000.0 - timeEndGetFileBytes;
+
+        PDFTextStripper stripper = null;
+        String existingText = null;
+        try {
+            stripper = new PDFTextStripper();
+            existingText = stripper.getText(pdf);
+        } catch (IOException e) {
+            String msg = "PDF strip error: " + e.getMessage();
+            Logger.log(msg, Log.LogLevel.ERROR);
+            return Response.serverError().entity(msg).build();
+        }
+
+        StringBuilder fullText = new StringBuilder();
+        String ocrText = existingText.trim();
+
+        double timeEndStripPfd = (System.nanoTime() - timeStart) / 1_000_000_000.0 -timeEndGetFileBytes - timeEndLoadPfd;
+
+        try {
+            if (ocrText.isEmpty()) {
+                Tesseract tesseract = OcrService.createTesseract();
+                PDFRenderer renderer = new PDFRenderer(pdf);
+                for (int i = 0; i < pdf.getNumberOfPages(); i++) {
+                    BufferedImage pageImage = renderer.renderImageWithDPI(i, 300);
+                    String pageText = OcrService.performOcr(tesseract, pageImage);
+                    fullText.append(pageText);
+                }
+                ocrText = fullText.toString();
+            }
+        } catch (Throwable e) {
+            String msg = "PDF strip error: " + e.getMessage();
+            Logger.log(msg, Log.LogLevel.ERROR);
+            return Response.serverError().entity(msg).build();
+        }
+
+        double timeEndOcr = ((System.nanoTime() - timeStart) / 1_000_000_000.0) -timeEndGetFileBytes -timeEndLoadPfd -timeEndStripPfd;
+
+        Set<Integer> matchedTagIds = getMatchedTagIds(ocrText);
         Set<Integer> allTagIds = new HashSet<>();
 
         if (!tagIds.equals("")) {
             String[] parts = tagIds.split(",");
-
             for (int i = 0; i<parts.length; i++) {
                 allTagIds.add(Integer.parseInt(parts[i]));
             }
         }
 
-        Set<Integer> matchedTagIds = getMatchedTagIds(fileBytes);
-
         allTagIds.addAll(matchedTagIds);
         Integer[] allTagIdsArray = allTagIds.toArray(new Integer[0]);
+
+        double timeEndTagResolving = ((System.nanoTime() - timeStart) / 1_000_000_000.0)
+                -timeEndGetFileBytes -timeEndLoadPfd -timeEndStripPfd -timeEndOcr;
 
         Timestamp timestamp = new java.sql.Timestamp(System.currentTimeMillis());
         String dateNameForFile = timestamp.toLocalDateTime()
@@ -174,6 +226,11 @@ public class Document {
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd.HH.mm.ss"));
 
         String fileName;
+
+        //TODO better exception handling, thus move vars to buttom
+        int documentID = 0;
+        double timeEndFilenameAndObjectBuilding = 0;
+        double timeEndChecksum = 0;
 
         try {
 
@@ -208,6 +265,10 @@ public class Document {
             // NOTE(CT) Lingua or tika for language recognition
             document.language = "de";
 
+            timeEndFilenameAndObjectBuilding =
+                    ((System.nanoTime() - timeStart) / 1_000_000_000.0)
+                            -timeEndGetFileBytes -timeEndLoadPfd -timeEndStripPfd -timeEndOcr -timeEndTagResolving;
+
             // create checksum
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(fileBytes);
@@ -217,14 +278,17 @@ public class Document {
             }
             document.checksum = stringBuilder.toString();
 
-            PDDocument pdf = PDDocument.load(fileBytes);
+            timeEndChecksum =
+                    ((System.nanoTime() - timeStart) / 1_000_000_000.0)
+                            -timeEndGetFileBytes -timeEndLoadPfd -timeEndStripPfd
+                            -timeEndOcr -timeEndTagResolving -timeEndFilenameAndObjectBuilding;
+
             document.countPages = pdf.getNumberOfPages();
-
-            PDFTextStripper stripper = new PDFTextStripper();
-            document.ocrText = stripper.getText(pdf);
             pdf.close();
+            document.ocrText = ocrText;
 
-            String trimmed = document.ocrText != null ? document.ocrText.trim() : "";
+
+            String trimmed = document.ocrText.trim();
             document.countWords = trimmed.isEmpty() ? 0 : trimmed.split("\\s+").length;
 
             Connection connection = DriverManager.getConnection(
@@ -233,7 +297,7 @@ public class Document {
                     DbConnection.PW);
 
             connection.setAutoCommit(false);
-            int documentID = TableDocument.post(connection, document);
+            documentID = TableDocument.post(connection, document);
             if (documentID == 0) {
                 throw new Exception();
             }
@@ -248,10 +312,9 @@ public class Document {
             try { connection.close(); } catch (Exception e) { /* Ignored */ }
             
         } catch (Exception e) {
-            String msg = "Database error";
             System.out.println(e.getMessage());
-            Logger.log(msg + "//" + e.getMessage(), Log.LogLevel.ERROR);
-            return Response.serverError().entity(msg).build();
+            Logger.log("//" + e.getMessage(), Log.LogLevel.ERROR);
+            return Response.serverError().entity(e.getMessage()).build();
         }
 
         String path = App.pathToDms + fileName;
@@ -264,7 +327,15 @@ public class Document {
         }
 
         double timeEnd = (System.nanoTime() - timeStart) / 1_000_000_000.0;
-        String msg = "new document archived --> " + fileName + " --> savetime=" + String.format("%.2f", timeEnd)+" sec.";
+        String msg = "new document archived --> " + documentID
+                + " --> timeGetFileBytes=" + String.format("%.2f", timeEndGetFileBytes)+" sec."
+                + " --> timeLoadPFD=" + String.format("%.2f", timeEndLoadPfd)+" sec."
+                + " --> timeStripPFD=" + String.format("%.2f", timeEndStripPfd)+" sec."
+                + " --> timeOCR=" + String.format("%.2f", timeEndOcr)+" sec."
+                + " --> timeTagResolving=" + String.format("%.2f", timeEndTagResolving)+" sec."
+                + " --> timeFileName/ObjectBuild=" + String.format("%.2f", timeEndFilenameAndObjectBuilding)+" sec."
+                + " --> timeChecksum=" + String.format("%.2f", timeEndChecksum)+" sec."
+                + " --> TotalSavetime=" + String.format("%.2f", timeEnd)+" sec.";
         Logger.log(msg, Log.LogLevel.INFO);
         return Response.ok().build();
     }
@@ -280,17 +351,18 @@ public class Document {
                 buffer.write(chunk, 0, read);
             }
             fileBytes = buffer.toByteArray();
-        } catch (IOException e) {}
+        } catch (IOException e) {
+            Logger.log(e.getMessage(), Log.LogLevel.ERROR);
+        }
 
         return fileBytes;
     }
 
-    private static Set<Integer> getMatchedTagIds(byte [] fileBytes) {
+    private static Set<Integer> getMatchedTagIds(String ocrText) {
         Set<Integer> matchedTagIds = new HashSet<>();
         try {
-            PDDocument doc = PDDocument.load(new ByteArrayInputStream(fileBytes));
-            String text = new PDFTextStripper().getText(doc).toLowerCase();
-            doc.close();
+
+            String text = ocrText.toLowerCase();
 
             Map<TagKeyword, Integer> keywordToTagId = TableTagKeyword.getKeywordToTagIdMap();
 
