@@ -42,6 +42,7 @@ import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -179,26 +180,35 @@ public class Document {
             return Response.serverError().entity(msg).build();
         }
 
-        StringBuilder fullText = new StringBuilder();
         String ocrText = existingText.trim();
+        byte[] searchablePdfBytes = null;
 
-        double timeEndStripPfd = (System.nanoTime() - timeStart) / 1_000_000_000.0 -timeEndGetFileBytes - timeEndLoadPfd;
+        double timeEndStripPfd = (System.nanoTime() - timeStart) / 1_000_000_000.0 - timeEndGetFileBytes - timeEndLoadPfd;
 
-        try {
-            if (ocrText.isEmpty()) {
+        if (ocrText.isEmpty()) {
+            try {
                 Tesseract tesseract = OcrService.createTesseract();
                 PDFRenderer renderer = new PDFRenderer(pdf);
+                List<BufferedImage> pages = new ArrayList<>();
                 for (int i = 0; i < pdf.getNumberOfPages(); i++) {
-                    BufferedImage pageImage = renderer.renderImageWithDPI(i, 300);
-                    String pageText = OcrService.performOcr(tesseract, pageImage);
-                    fullText.append(pageText);
+                    pages.add(renderer.renderImageWithDPI(i, 300));
                 }
-                ocrText = fullText.toString();
+                searchablePdfBytes = OcrService.createSearchablePdf(tesseract, pages);
+
+                // free memory
+                for (int i = 0; i < pages.size(); i++) {
+                    pages.get(i).flush();
+                }
+                pages.clear();
+
+                try (PDDocument searchablePdf = PDDocument.load(searchablePdfBytes)) {
+                    ocrText = new PDFTextStripper().getText(searchablePdf);
+                }
+            } catch (Throwable e) {
+                String msg = "OCR error: " + e.getMessage();
+                Logger.log(msg, Log.LogLevel.ERROR);
+                return Response.serverError().entity(msg).build();
             }
-        } catch (Throwable e) {
-            String msg = "PDF strip error: " + e.getMessage();
-            Logger.log(msg, Log.LogLevel.ERROR);
-            return Response.serverError().entity(msg).build();
         }
 
         double timeEndOcr = ((System.nanoTime() - timeStart) / 1_000_000_000.0) -timeEndGetFileBytes -timeEndLoadPfd -timeEndStripPfd;
@@ -232,6 +242,8 @@ public class Document {
         double timeEndFilenameAndObjectBuilding = 0;
         double timeEndChecksum = 0;
 
+        byte[] bytesToSave = searchablePdfBytes != null ? searchablePdfBytes : fileBytes;
+
         try {
 
             List<String> tagNames = TableTag.getNamesByIds(allTagIdsArray);
@@ -259,7 +271,7 @@ public class Document {
 
             document.deskewDone = false;
             document.parentId = parentId;
-            document.fileSize = fileBytes.length;
+            document.fileSize = bytesToSave.length;
             // NOTE(CT) if we want to add support for other file formats Tika seems to be the way to go
             document.mimeType = "application/pdf";
             // NOTE(CT) Lingua or tika for language recognition
@@ -271,7 +283,7 @@ public class Document {
 
             // create checksum
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(fileBytes);
+            byte[] hash = digest.digest(bytesToSave);
             StringBuilder stringBuilder = new StringBuilder();
             for (int i = 0; i < hash.length; i++) {
                 stringBuilder.append(String.format("%02x", hash[i]));
@@ -319,7 +331,7 @@ public class Document {
 
         String path = App.pathToDms + fileName;
         try {
-            Files.write(Paths.get(path), fileBytes);
+            Files.write(Paths.get(path), bytesToSave);
         } catch (IOException e) {
             String msg = "File write error: " + fileName;
             Logger.log(msg, Log.LogLevel.ERROR);
@@ -337,6 +349,7 @@ public class Document {
                 + " --> timeChecksum=" + String.format("%.2f", timeEndChecksum)+" sec."
                 + " --> TotalSavetime=" + String.format("%.2f", timeEnd)+" sec.";
         Logger.log(msg, Log.LogLevel.INFO);
+        System.gc();
         return Response.ok().build();
     }
 
