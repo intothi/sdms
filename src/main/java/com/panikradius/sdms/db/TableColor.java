@@ -34,7 +34,7 @@ public class TableColor {
 
     public static void insertDefaultColors(Connection connection) throws SQLException {
 
-        if (DbHelper.hasEntry(tableConnectionInfo, "")) {
+        if (DbHelper.hasEntry(tableConnectionInfo)) {
             return;
         }
 

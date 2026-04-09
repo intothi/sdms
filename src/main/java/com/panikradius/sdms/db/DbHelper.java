@@ -86,7 +86,7 @@ public class DbHelper {
         }
     }
 
-    public static boolean hasEntry(TableConnectionInfo tableConnectionInfo, String whereStatement) {
+    public static boolean hasEntry(TableConnectionInfo tableConnectionInfo) {
         Connection connection = null;
         Statement statement = null;
         ResultSet resultSet = null;

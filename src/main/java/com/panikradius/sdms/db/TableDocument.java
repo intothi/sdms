@@ -424,4 +424,29 @@ public class TableDocument {
             try { if (preparedStatement != null) preparedStatement.close(); } catch (Exception e) {}
         }
     }
+
+    public static List<com.panikradius.sdms.models.Document> getAll() throws Exception {
+        Connection connection = DriverManager.getConnection(
+                DbConnection.DB_URL,
+                DbConnection.USER,
+                DbConnection.PW);
+
+        String query = "SELECT fileName, checksum FROM document";
+        PreparedStatement stmt = connection.prepareStatement(query);
+        ResultSet rs = stmt.executeQuery();
+
+        List<com.panikradius.sdms.models.Document> result = new ArrayList<>();
+        while (rs.next()) {
+            com.panikradius.sdms.models.Document doc = new com.panikradius.sdms.models.Document();
+            doc.fileName = rs.getString(1);
+            doc.checksum = rs.getString(2);
+            result.add(doc);
+        }
+
+        try { rs.close(); } catch (Exception e) { /* Ignored */ }
+        try { stmt.close(); } catch (Exception e) { /* Ignored */ }
+        try { connection.close(); } catch (Exception e) { /* Ignored */ }
+
+        return result;
+    }
 }
