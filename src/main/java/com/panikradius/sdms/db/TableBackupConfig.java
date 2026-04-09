@@ -19,9 +19,9 @@ public class TableBackupConfig {
 
     public static String QUERY_CREATE = "CREATE TABLE " + tableConnectionInfo.tableName + " ("
             + "id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
-            + "backupIntervalDays INT NOT NULL 1, "
-            + "backupPath VARCHAR(1023) NOT NULL '/home/pi', "
-            + "backupTime TIME NOT NULL '03:00:00', "
+            + "backupIntervalDays INT NOT NULL, "
+            + "backupPath VARCHAR(1023) NOT NULL, "
+            + "backupTime TIME NOT NULL, "
             + "PRIMARY KEY (id)"
             + ")";
 

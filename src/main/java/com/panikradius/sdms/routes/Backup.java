@@ -73,6 +73,7 @@ public class Backup {
     public Response updateConfig(BackupConfig config) {
         try {
             TableBackupConfig.update(config);
+            BackupService.updateCronJob(config);
             return Response.ok().build();
         } catch (Exception e) {
             String msg = "Backup config update error: " + e.getMessage();

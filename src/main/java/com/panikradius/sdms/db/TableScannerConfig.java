@@ -35,7 +35,7 @@ public class TableScannerConfig {
 
     public static void insertDefaultValues(Connection connection) throws SQLException {
 
-        if (DbHelper.hasEntry(tableConnectionInfo, "")) {
+        if (DbHelper.hasEntry(tableConnectionInfo)) {
             return;
         }
 

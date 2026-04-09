@@ -18,6 +18,8 @@ import java.sql.DriverManager;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
+
+import com.panikradius.sdms.models.Log;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 
@@ -157,5 +159,50 @@ public class BackupService {
         TableBackup.post(connection, backup);
         connection.commit();
         try { connection.close(); } catch (Exception e) { /* Ignored */ }
+    }
+
+    public static void updateCronJob(BackupConfig config) throws Exception {
+        String cronExpression = parseToCronExpression(config.backupTime);
+        String cronLine = cronExpression + " curl -s -X POST http://localhost:8080/v1/backup/trigger";
+
+        // Aktuellen Crontab auslesen
+        ProcessBuilder pbRead = new ProcessBuilder("crontab", "-l");
+        pbRead.redirectErrorStream(false);
+        Process processRead = pbRead.start();
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        byte[] chunk = new byte[8192];
+        int read;
+        while ((read = processRead.getInputStream().read(chunk)) != -1) {
+            buffer.write(chunk, 0, read);
+        }
+        int readExitCode = processRead.waitFor();
+        String currentCrontab = readExitCode == 0 ? buffer.toString() : "";
+
+        // SDMS-Zeile entfernen falls vorhanden
+        StringBuilder newCrontab = new StringBuilder();
+        String[] lines = currentCrontab.split("\n");
+        for (int i = 0; i < lines.length; i++) {
+            if (!lines[i].contains("backup/trigger")) {
+                newCrontab.append(lines[i]).append("\n");
+            }
+        }
+        newCrontab.append(cronLine).append("\n");
+
+        Logger.log("updateCronJob new crontab: " + newCrontab.toString(), Log.LogLevel.INFO);
+        // Neuen Crontab schreiben
+        ProcessBuilder pbWrite = new ProcessBuilder("crontab", "-");
+        pbWrite.redirectErrorStream(true);
+        Process processWrite = pbWrite.start();
+        processWrite.getOutputStream().write(newCrontab.toString().getBytes());
+        processWrite.getOutputStream().close();
+        processWrite.waitFor();
+        Logger.log("updateCronJob exit code: " + processWrite.exitValue(), Log.LogLevel.INFO);
+    }
+
+    private static String parseToCronExpression(String backupTime) {
+        String[] parts = backupTime.split(":");
+        String hour = parts[0];
+        String minute = parts[1];
+        return minute + " " + hour + " * * *";
     }
 }

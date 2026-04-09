@@ -32,7 +32,7 @@ public class TableCategory {
 
     public static void insertDefaultCategories(Connection connection) throws SQLException {
 
-        if (DbHelper.hasEntry(tableConnectionInfo, "")) {
+        if (DbHelper.hasEntry(tableConnectionInfo)) {
             return;
         }
 

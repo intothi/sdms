@@ -95,8 +95,15 @@ public class HomeStats {
             long jvmTotal = runtime.maxMemory();
 
             // Letztes Backup
-            // TODO: implementieren sobald backup Tabelle existiert
+            PreparedStatement preparedStatementBackup = connection.prepareStatement(
+                    "SELECT dateTimeCreated FROM backup ORDER BY dateTimeCreated DESC LIMIT 1"
+            );
+            ResultSet resultSetBackup = preparedStatementBackup.executeQuery();
             String lastBackup = null;
+            if (resultSetBackup.next()) {
+                lastBackup = resultSetBackup.getString("dateTimeCreated");
+            }
+            preparedStatementBackup.close();
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("totalDocuments", totalDocuments);

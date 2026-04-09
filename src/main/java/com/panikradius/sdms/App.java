@@ -2,6 +2,8 @@
 package com.panikradius.sdms;
 
 import com.panikradius.sdms.db.DbConnection;
+import com.panikradius.sdms.db.TableBackup;
+import com.panikradius.sdms.db.TableBackupConfig;
 import com.panikradius.sdms.db.TableCategory;
 import com.panikradius.sdms.db.TableColor;
 import com.panikradius.sdms.db.TableDocument;
@@ -54,8 +56,11 @@ public class App {
         HttpServer server = JdkHttpServerFactory.createHttpServer(URI.create("http://localhost:8080/v1"), rc);
         System.out.println("backend is listening ...");
 
-        // Fristen + Häckchen setzen können
-        // Notifikation
+        try {
+            BackupService.updateCronJob(TableBackupConfig.get());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
     }
 
@@ -95,6 +100,7 @@ public class App {
             TableScannerConfig.insertDefaultValues(connection);
             TableColor.insertDefaultColors(connection);
             TableCategory.insertDefaultCategories(connection);
+            TableBackupConfig.insertDefaultValues(connection);
             //TableTag.insertDefaultTags(connection);
 
             connection.commit();
@@ -114,6 +120,8 @@ public class App {
         TableDocument.buildTable();
         TableDocumentTag.buildTable();
         TableTagKeyword.buildTable();
+        TableBackupConfig.buildTable();
+        TableBackup.buildTable();
         System.out.println("finished creating tables");
     }
 

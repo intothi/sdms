@@ -41,7 +41,7 @@ public class TableTag {
 
     public static void insertDefaultTags(Connection connection) throws SQLException {
 
-        if (DbHelper.hasEntry(tableConnectionInfo, "")) {
+        if (DbHelper.hasEntry(tableConnectionInfo)) {
             return;
         }
 

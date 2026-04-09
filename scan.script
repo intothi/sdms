@@ -56,6 +56,7 @@ scanimage \
     -x $PAGE_WIDTH \
     -y $PAGE_HEIGHT \
     --swskip $SWSKIP \
+    --swdeskew=yes \
     --batch="$TMPDIR/scan_${TIMESTAMP}_%d.tiff"
 
 if [ $? -ne 0 ]; then
