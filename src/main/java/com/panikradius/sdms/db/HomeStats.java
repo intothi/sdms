@@ -2,15 +2,10 @@ package com.panikradius.sdms.db;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.panikradius.sdms.App;
-import com.panikradius.sdms.Logger;
-import com.panikradius.sdms.models.Log;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
-import java.nio.file.FileStore;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;

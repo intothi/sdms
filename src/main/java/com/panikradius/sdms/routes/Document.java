@@ -3,7 +3,6 @@ package com.panikradius.sdms.routes;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.panikradius.sdms.App;
 import com.panikradius.sdms.Logger;
-import com.panikradius.sdms.OcrService;
 import com.panikradius.sdms.db.DbConnection;
 import com.panikradius.sdms.db.TableDocument;
 import com.panikradius.sdms.db.TableDocumentTag;
@@ -22,15 +21,11 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import net.sourceforge.tess4j.Tesseract;
 import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.glassfish.jersey.media.multipart.FormDataParam;
 
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,7 +37,6 @@ import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -173,6 +167,7 @@ public class Document {
         String existingText = null;
         try {
             stripper = new PDFTextStripper();
+            //TODO very poor performance
             existingText = stripper.getText(pdf);
         } catch (IOException e) {
             String msg = "PDF strip error: " + e.getMessage();
@@ -180,38 +175,17 @@ public class Document {
             return Response.serverError().entity(msg).build();
         }
 
-        String ocrText = existingText.trim();
-        byte[] searchablePdfBytes = null;
-
-        double timeEndStripPfd = (System.nanoTime() - timeStart) / 1_000_000_000.0 - timeEndGetFileBytes - timeEndLoadPfd;
-
-        if (ocrText.isEmpty()) {
-            try {
-                Tesseract tesseract = OcrService.createTesseract();
-                PDFRenderer renderer = new PDFRenderer(pdf);
-                List<BufferedImage> pages = new ArrayList<>();
-                for (int i = 0; i < pdf.getNumberOfPages(); i++) {
-                    pages.add(renderer.renderImageWithDPI(i, 300));
-                }
-                searchablePdfBytes = OcrService.createSearchablePdf(tesseract, pages);
-
-                // free memory
-                for (int i = 0; i < pages.size(); i++) {
-                    pages.get(i).flush();
-                }
-                pages.clear();
-
-                try (PDDocument searchablePdf = PDDocument.load(searchablePdfBytes)) {
-                    ocrText = new PDFTextStripper().getText(searchablePdf);
-                }
-            } catch (Throwable e) {
-                String msg = "OCR error: " + e.getMessage();
-                Logger.log(msg, Log.LogLevel.ERROR);
-                return Response.serverError().entity(msg).build();
-            }
+        int countPages = pdf.getNumberOfPages();
+        try {
+            pdf.close();
+        } catch (IOException e) {
+            String msg = "Could not close PDF, this could leak memory: " + e.getMessage();
+            Logger.log(msg, Log.LogLevel.ERROR);
         }
 
-        double timeEndOcr = ((System.nanoTime() - timeStart) / 1_000_000_000.0) -timeEndGetFileBytes -timeEndLoadPfd -timeEndStripPfd;
+        String ocrText = existingText.trim();
+
+        double timeEndStripPfd = (System.nanoTime() - timeStart) / 1_000_000_000.0 - timeEndGetFileBytes - timeEndLoadPfd;
 
         Set<Integer> matchedTagIds = getMatchedTagIds(ocrText);
         Set<Integer> allTagIds = new HashSet<>();
@@ -227,7 +201,7 @@ public class Document {
         Integer[] allTagIdsArray = allTagIds.toArray(new Integer[0]);
 
         double timeEndTagResolving = ((System.nanoTime() - timeStart) / 1_000_000_000.0)
-                -timeEndGetFileBytes -timeEndLoadPfd -timeEndStripPfd -timeEndOcr;
+                -timeEndGetFileBytes -timeEndLoadPfd -timeEndStripPfd;
 
         Timestamp timestamp = new java.sql.Timestamp(System.currentTimeMillis());
         String dateNameForFile = timestamp.toLocalDateTime()
@@ -241,8 +215,6 @@ public class Document {
         int documentID = 0;
         double timeEndFilenameAndObjectBuilding = 0;
         double timeEndChecksum = 0;
-
-        byte[] bytesToSave = searchablePdfBytes != null ? searchablePdfBytes : fileBytes;
 
         try {
 
@@ -271,7 +243,7 @@ public class Document {
 
             document.deskewDone = false;
             document.parentId = parentId;
-            document.fileSize = bytesToSave.length;
+            document.fileSize = fileBytes.length;
             // NOTE(CT) if we want to add support for other file formats Tika seems to be the way to go
             document.mimeType = "application/pdf";
             // NOTE(CT) Lingua or tika for language recognition
@@ -279,11 +251,11 @@ public class Document {
 
             timeEndFilenameAndObjectBuilding =
                     ((System.nanoTime() - timeStart) / 1_000_000_000.0)
-                            -timeEndGetFileBytes -timeEndLoadPfd -timeEndStripPfd -timeEndOcr -timeEndTagResolving;
+                            -timeEndGetFileBytes -timeEndLoadPfd -timeEndStripPfd -timeEndTagResolving;
 
             // create checksum
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(bytesToSave);
+            byte[] hash = digest.digest(fileBytes);
             StringBuilder stringBuilder = new StringBuilder();
             for (int i = 0; i < hash.length; i++) {
                 stringBuilder.append(String.format("%02x", hash[i]));
@@ -293,12 +265,10 @@ public class Document {
             timeEndChecksum =
                     ((System.nanoTime() - timeStart) / 1_000_000_000.0)
                             -timeEndGetFileBytes -timeEndLoadPfd -timeEndStripPfd
-                            -timeEndOcr -timeEndTagResolving -timeEndFilenameAndObjectBuilding;
+                            -timeEndTagResolving -timeEndFilenameAndObjectBuilding;
 
-            document.countPages = pdf.getNumberOfPages();
-            pdf.close();
+            document.countPages = countPages;
             document.ocrText = ocrText;
-
 
             String trimmed = document.ocrText.trim();
             document.countWords = trimmed.isEmpty() ? 0 : trimmed.split("\\s+").length;
@@ -331,7 +301,7 @@ public class Document {
 
         String path = App.pathToDms + fileName;
         try {
-            Files.write(Paths.get(path), bytesToSave);
+            Files.write(Paths.get(path), fileBytes);
         } catch (IOException e) {
             String msg = "File write error: " + fileName;
             Logger.log(msg, Log.LogLevel.ERROR);
@@ -343,7 +313,6 @@ public class Document {
                 + " --> timeGetFileBytes=" + String.format("%.2f", timeEndGetFileBytes)+" sec."
                 + " --> timeLoadPFD=" + String.format("%.2f", timeEndLoadPfd)+" sec."
                 + " --> timeStripPFD=" + String.format("%.2f", timeEndStripPfd)+" sec."
-                + " --> timeOCR=" + String.format("%.2f", timeEndOcr)+" sec."
                 + " --> timeTagResolving=" + String.format("%.2f", timeEndTagResolving)+" sec."
                 + " --> timeFileName/ObjectBuild=" + String.format("%.2f", timeEndFilenameAndObjectBuilding)+" sec."
                 + " --> timeChecksum=" + String.format("%.2f", timeEndChecksum)+" sec."

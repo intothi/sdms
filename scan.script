@@ -8,7 +8,7 @@ exec > /tmp/sdms_scan.log 2>&1
 BACKEND="http://localhost:8080/v1/document/post"
 TMPDIR="/tmp/sdms_scan"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-PDF_FINAL="$TMPDIR/scan_$TIMESTAMP"
+PDF_FINAL="$TMPDIR/scan_$TIMESTAMP"  # tesseract fügt .pdf selbst an
 
 mkdir -p $TMPDIR
 
@@ -64,22 +64,32 @@ if [ $? -ne 0 ]; then
 fi
 echo "Scan abgeschlossen"
 
-# ── 2. Pro Seite: TIFF zu PDF konvertieren ───────────────────
+# ── 2. Pro Seite: Deskew + Orientierung korrigieren + OCR ────
 PAGE_PDFS=""
 for TIFF in "$TMPDIR/scan_${TIMESTAMP}_"*.tiff; do
     PAGE=$(basename $TIFF .tiff)
-    PDF_PAGE="$TMPDIR/$PAGE.pdf"
+    PDF_PAGE="$TMPDIR/$PAGE"
 
-    img2pdf $TIFF -o $PDF_PAGE
+    # Orientierung erkennen
+    ROTATE=$(tesseract $TIFF stdout --psm 0 2>&1 | grep "Rotate" | head -1 | awk '{print $2}')
+    echo "Seite $PAGE – Rotationswinkel: $ROTATE"
+
+    if [ ! -z "$ROTATE" ] && [ "$ROTATE" != "0" ]; then
+        echo "Drehe $PAGE um $ROTATE Grad..."
+        convert $TIFF -rotate $ROTATE $TIFF
+    fi
+
+    # OCR + PDF
+    tesseract $TIFF $PDF_PAGE -l deu pdf
     if [ $? -ne 0 ]; then
-        echo "Fehler bei Konvertierung auf $PAGE"
+        echo "Fehler bei OCR auf $PAGE"
         exit 1
     fi
 
-    PAGE_PDFS="$PAGE_PDFS $PDF_PAGE"
+    PAGE_PDFS="$PAGE_PDFS $PDF_PAGE.pdf"
     rm -f $TIFF
 done
-echo "Konvertierung abgeschlossen"
+echo "OCR abgeschlossen"
 
 # ── 3. PDFs zusammenfügen ────────────────────────────────────
 pdfunite $PAGE_PDFS $PDF_FINAL.pdf
@@ -92,7 +102,7 @@ rm -f $PAGE_PDFS
 echo "PDFs zusammengefügt: $PDF_FINAL.pdf"
 
 # ── 4. An SDMS Backend senden ────────────────────────────────
-curl -s -f -v -X POST "$BACKEND" \
+curl -s -X POST "$BACKEND" \
     -F "file=@$PDF_FINAL.pdf" \
     -F "comment=" \
     -F "tagIds=" \
