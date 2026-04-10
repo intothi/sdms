@@ -18,6 +18,7 @@ if [ -f "$LOCKFILE" ]; then
     echo "Scan läuft bereits, abbrechen"
     exit 0
 fi
+curl -s -X POST http://localhost:8080/v1/scan/start
 touch $LOCKFILE
 trap "rm -f $LOCKFILE" EXIT
 
@@ -113,6 +114,7 @@ if [ $? -ne 0 ]; then
     echo "Fehler beim Senden ans Backend"
     exit 1
 fi
+curl -s -X POST http://localhost:8080/v1/scan/done
 echo "Dokument erfolgreich hochgeladen: $(basename $PDF_FINAL.pdf)"
 
 # ── 5. Aufräumen ─────────────────────────────────────────────
