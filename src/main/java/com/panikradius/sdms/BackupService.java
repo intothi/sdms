@@ -55,8 +55,6 @@ public class BackupService {
         processBuilder.redirectErrorStream(false);
         Process process = processBuilder.start();
 
-        //byte[] dump = process.getInputStream().readAllBytes();
-
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         byte[] chunk = new byte[8192];
         int read;

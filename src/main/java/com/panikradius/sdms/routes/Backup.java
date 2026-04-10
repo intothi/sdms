@@ -9,6 +9,7 @@ import com.panikradius.sdms.models.BackupConfig;
 import com.panikradius.sdms.models.Log;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -77,6 +78,21 @@ public class Backup {
             return Response.ok().build();
         } catch (Exception e) {
             String msg = "Backup config update error: " + e.getMessage();
+            Logger.log(msg, Log.LogLevel.ERROR);
+            return Response.serverError().entity(msg).build();
+        }
+    }
+
+    @POST
+    @Path("/trigger")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response trigger() {
+        try {
+            BackupConfig config = TableBackupConfig.get();
+            BackupService.createBackup(config, BackupService.CREATED_BY_CRONJOB);
+            return Response.ok().build();
+        } catch (Exception e) {
+            String msg = "Backup trigger error: " + e.getMessage();
             Logger.log(msg, Log.LogLevel.ERROR);
             return Response.serverError().entity(msg).build();
         }
