@@ -199,7 +199,8 @@ public class TableDocument {
             List<Object> params = new ArrayList<>();
 
             if (!name.isEmpty()) {
-                whereClause.append(" WHERE LOWER(fileName) LIKE LOWER(?) ");
+                whereClause.append(" WHERE (MATCH(ocrText) AGAINST(?) OR LOWER(comment) LIKE LOWER(?)) ");
+                params.add(name);
                 params.add("%" + name + "%");
             }
 
