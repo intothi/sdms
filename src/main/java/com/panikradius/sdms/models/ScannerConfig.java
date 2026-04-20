@@ -1,6 +1,5 @@
 package com.panikradius.sdms.models;
 
-
 public class ScannerConfig {
 
     public int id;
@@ -10,7 +9,6 @@ public class ScannerConfig {
     public int swSkip;
     public float pageWidth;
     public float pageHeight;
-
 
     public ScannerConfig(){}
 

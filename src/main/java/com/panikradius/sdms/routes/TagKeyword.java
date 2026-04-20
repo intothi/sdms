@@ -1,9 +1,7 @@
 package com.panikradius.sdms.routes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.panikradius.sdms.Logger;
 import com.panikradius.sdms.db.TableTagKeyword;
-import com.panikradius.sdms.models.Log;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
@@ -46,13 +44,6 @@ public class TagKeyword {
     @Path("/post")
     @Consumes(MediaType.APPLICATION_JSON)
     public Response post(com.panikradius.sdms.models.TagKeyword tagKeyword) {
-
-//        if (TableTagKeyword.isAlreadyExisting(tagKeyword)) {
-//            String msg = "could not save tagKeyword with name: " + tagKeyword.keyword + " because it already exists";
-//            Logger.log(msg, Log.LogLevel.INFO);
-//            return Response.serverError().build();
-//        }
-
         TableTagKeyword.postPreparedStatement(tagKeyword);
         return Response.ok().build();
     }

@@ -1,4 +1,11 @@
 #!/bin/bash
+#
+# Author Christoph Thum
+#
+# AI Usage Disclosure: This document was created with assistance from AI tools.
+# The content has been reviewed and edited by a human.
+# For more information on the extent and nature of AI usage, please contact the author.
+#
 # ============================================================
 # SDMS Scan Script
 # Wird von scanbd beim Drücken des Scan-Knopfs ausgeführt
@@ -18,8 +25,9 @@ if [ -f "$LOCKFILE" ]; then
     echo "Scan läuft bereits, abbrechen"
     exit 0
 fi
+curl -s -X POST http://localhost:8080/v1/scan/start
 touch $LOCKFILE
-trap "rm -f $LOCKFILE" EXIT
+trap "rm -f $LOCKFILE; curl -s -X POST http://localhost:8080/v1/scan/done" EXIT
 
 echo "SDMS Scan gestartet: $TIMESTAMP"
 
@@ -56,6 +64,7 @@ scanimage \
     -x $PAGE_WIDTH \
     -y $PAGE_HEIGHT \
     --swskip $SWSKIP \
+    --swdeskew=yes \
     --batch="$TMPDIR/scan_${TIMESTAMP}_%d.tiff"
 
 if [ $? -ne 0 ]; then
@@ -112,6 +121,7 @@ if [ $? -ne 0 ]; then
     echo "Fehler beim Senden ans Backend"
     exit 1
 fi
+curl -s -X POST http://localhost:8080/v1/scan/done
 echo "Dokument erfolgreich hochgeladen: $(basename $PDF_FINAL.pdf)"
 
 # ── 5. Aufräumen ─────────────────────────────────────────────

@@ -66,14 +66,8 @@ public class App {
 
     private static void dbTest() {
         System.out.println("initialization");
-        if (!com.panikradius.sdms.db.DbHelper.testDbConnection()) {
-            System.exit(-1);
-        }
-
-        if (!com.panikradius.sdms.db.DbHelper.testCredentials()) {
-            System.exit(-1);
-            //TODO create com.panikradius.sdms.db user,password and privileges via java
-        }
+        if (!com.panikradius.sdms.db.DbHelper.testDbConnection()) { System.exit(-1); }
+        if (!com.panikradius.sdms.db.DbHelper.testCredentials()) { System.exit(-1); }
     }
 
     private static void createEnvironment() {

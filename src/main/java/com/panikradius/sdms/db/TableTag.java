@@ -2,7 +2,6 @@ package com.panikradius.sdms.db;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.panikradius.sdms.models.Log;
 import com.panikradius.sdms.models.Tag;
 
 import java.sql.Connection;
@@ -10,7 +9,6 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -37,58 +35,6 @@ public class TableTag {
 
     public static void buildTable() {
         DbHelper.buildTable(tableConnectionInfo, QUERY_CREATE);
-    }
-
-    public static void insertDefaultTags(Connection connection) throws SQLException {
-
-        if (DbHelper.hasEntry(tableConnectionInfo)) {
-            return;
-        }
-
-        String query = "INSERT INTO " + tableConnectionInfo.tableName +
-                "(name, colorId, categoryId, dateTimeCreated)" +
-                "VALUES (?, ?, ?, NOW())";
-
-        PreparedStatement preparedStatement = connection.prepareStatement(query);
-
-        String[][] tagData = {
-                // { name, colorId, categoryId }
-                // Dokumentenart
-                { "Rechnung",          "1",  "1" },
-                { "Vertrag",           "6",  "1" },
-                { "Kontoauszug",       "1",  "1" },
-                { "Bescheid",          "3",  "1" },
-                { "Quittung",          "10", "1" },
-                { "Angebot",           "9",  "1" },
-                { "Garantie",          "5",  "1" },
-                { "Ausweis/Zertifikat","4",  "1" },
-                // Absender
-                { "Versicherung",      "6",  "2" },
-                { "Bank",              "1",  "2" },
-                { "Finanzamt",         "3",  "2" },
-                { "Arzt/Gesundheit",   "7",  "2" },
-                { "Arbeitgeber",       "9",  "2" },
-                { "Wohnung/Miete",     "10", "2" },
-                { "Fahrzeug",          "5",  "2" },
-                { "Internet/Telefon",  "10", "2" },
-                // Status
-                { "Dringend",          "3",  "3" },
-                { "Erledigt",          "2",  "3" },
-                { "Offen",             "1",  "3" },
-                { "Archiv",            "8",  "3" },
-                // Person
-                { "Christoph",         "1",  "4" },
-                { "Simone",            "4",  "4" },
-        };
-
-        for (int i = 0; i < tagData.length; i++) {
-            preparedStatement.setString(1, tagData[i][0]);
-            preparedStatement.setInt(2, Integer.parseInt(tagData[i][1]));
-            preparedStatement.setInt(3, Integer.parseInt(tagData[i][2]));
-            preparedStatement.executeUpdate();
-        }
-
-        preparedStatement.close();
     }
 
     public static void postPreparedStatement(Tag tag) {
@@ -149,11 +95,6 @@ public class TableTag {
 
         return false;
     }
-
-
-//    public static String get(int id) throws JsonProcessingException {
-//        return DbHelper.getById(tableConnectionInfo, id);
-//    }
 
     public static void deleteById(int id) {
         DbHelper.deleteById(tableConnectionInfo, id);

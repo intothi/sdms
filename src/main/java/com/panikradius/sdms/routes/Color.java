@@ -1,10 +1,7 @@
 package com.panikradius.sdms.routes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.panikradius.sdms.Logger;
-import com.panikradius.sdms.db.TableCategory;
 import com.panikradius.sdms.db.TableColor;
-import com.panikradius.sdms.models.Log;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;

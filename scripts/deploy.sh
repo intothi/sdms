@@ -1,5 +1,11 @@
 #!/bin/bash
 # ============================================================
+# Author Christoph Thum
+#
+# AI Usage Disclosure: This document was created with assistance from AI tools.
+# The content has been reviewed and edited by a human.
+# For more information on the extent and nature of AI usage, please contact the author.
+#
 # SDMS Deploy Script
 # Aufruf: ./deploy.sh
 # Voraussetzung: SSH-Key auf dem Pi hinterlegt

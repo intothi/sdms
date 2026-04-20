@@ -2,6 +2,8 @@ package com.panikradius.sdms.db;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.panikradius.sdms.App;
+import com.panikradius.sdms.Logger;
+import com.panikradius.sdms.models.Log;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -27,104 +29,153 @@ public class HomeStats {
 
     public static String getStats() throws Exception {
         Connection connection = null;
-        PreparedStatement preparedStatementStats = null;
-        PreparedStatement preparedStatementDue = null;
-
         try {
             connection = DriverManager.getConnection(
                     tableConnectionInfo.dbConnectionURL,
                     tableConnectionInfo.user,
                     tableConnectionInfo.pw);
+        } catch (Exception e) {
+            Logger.log(e.getMessage(), Log.LogLevel.ERROR);
+            return "";
+        }
 
-            // Gesamtanzahl + Gesamtgröße
-            preparedStatementStats = connection.prepareStatement(
+        com.panikradius.sdms.models.HomeStats homeStats = new com.panikradius.sdms.models.HomeStats();
+
+        fillDocInfo(connection, homeStats);
+        fillDocDueInfo(connection, homeStats);
+        fillLastBackupInfo(connection,homeStats);
+        try { connection.close(); } catch (Exception e) {}
+        fillFileSystemInfo(homeStats);
+        fillRAMInfo(homeStats);
+        fillJVMINFO(homeStats);
+
+        return new ObjectMapper().writer().withDefaultPrettyPrinter().writeValueAsString(homeStats);
+    }
+
+    private static void fillDocInfo(
+            Connection connection,
+            com.panikradius.sdms.models.HomeStats homeStats)
+    {
+        PreparedStatement preparedStatement = null;
+
+        try {
+            preparedStatement = connection.prepareStatement(
                     "SELECT COUNT(*) AS totalDocuments, COALESCE(SUM(fileSize), 0) AS totalSize FROM document"
             );
-            ResultSet resultSetStats = preparedStatementStats.executeQuery();
-            int totalDocuments = 0;
-            long totalSize = 0;
-            if (resultSetStats.next()) {
-                totalDocuments = resultSetStats.getInt("totalDocuments");
-                totalSize      = resultSetStats.getLong("totalSize");
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+            preparedStatement.close();
+
+            if (resultSet.next()) {
+                homeStats.totalDocuments = resultSet.getInt("totalDocuments");
+                homeStats.totalSize = resultSet.getLong("totalSize");
             }
 
-            // Fällige Dokumente in den nächsten 14 Tagen
-            preparedStatementDue = connection.prepareStatement(
+        } catch (Exception e) { Logger.log(e.getMessage(), Log.LogLevel.ERROR); }
+    }
+
+    private static void fillDocDueInfo(
+            Connection connection,
+            com.panikradius.sdms.models.HomeStats homeStats)
+    {
+
+        int dueDays = 14;
+        PreparedStatement preparedStatement = null;
+
+        try {
+            preparedStatement = connection.prepareStatement(
                     "SELECT id, fileName, dueDate FROM document " +
-                            "WHERE dueDate IS NOT NULL AND dueDate <= DATE_ADD(CURDATE(), INTERVAL 14 DAY) " +
+                            "WHERE dueDate IS NOT NULL AND dueDate <= DATE_ADD(CURDATE(), INTERVAL " + dueDays + " DAY) " +
                             "AND done = FALSE " +
                             "ORDER BY dueDate ASC"
             );
-            ResultSet resultSetDue = preparedStatementDue.executeQuery();
-            List<Map<String, Object>> dueSoon = new ArrayList<>();
-            while (resultSetDue.next()) {
+            ResultSet resultSet = preparedStatement.executeQuery();
+            preparedStatement.close();
+
+            while (resultSet.next()) {
                 Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("id",       resultSetDue.getInt("id"));
-                entry.put("fileName", resultSetDue.getString("fileName"));
-                entry.put("dueDate",  resultSetDue.getString("dueDate"));
-                dueSoon.add(entry);
+                entry.put("id",       resultSet.getInt("id"));
+                entry.put("fileName", resultSet.getString("fileName"));
+                entry.put("dueDate",  resultSet.getString("dueDate"));
+                homeStats.dueSoon.add(entry);
             }
 
+        } catch (Exception e) { Logger.log(e.getMessage(), Log.LogLevel.ERROR); }
+    }
+
+    private static void fillFileSystemInfo(
+            com.panikradius.sdms.models.HomeStats homeStats
+    ) {
+
+        try {
             File dmsDir = new File(App.pathToDms);
             long diskTotal = dmsDir.getTotalSpace();
             long diskFree  = dmsDir.getUsableSpace();
             long diskUsed  = diskTotal - diskFree;
 
-            // RAM
-            long ramTotal = 0, ramUsed = 0, ramFree = 0;
-            ProcessBuilder pbRam = new ProcessBuilder("free", "-k");
-            pbRam.redirectErrorStream(true);
-            Process processRam = pbRam.start();
-            BufferedReader readerRam = new BufferedReader(new InputStreamReader(processRam.getInputStream()));
+            homeStats.diskTotal = diskTotal;
+            homeStats.diskFree = diskFree;
+            homeStats.diskUsed = diskUsed;
+
+        } catch (Exception e) {
+            Logger.log(e.getMessage(), Log.LogLevel.ERROR);
+        }
+    }
+
+    private static void fillRAMInfo(com.panikradius.sdms.models.HomeStats homeStats){
+
+        ProcessBuilder processBuilder = new ProcessBuilder("free", "-k");
+        processBuilder.redirectErrorStream(true);
+
+        try {
+            Process process = processBuilder.start();
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
             String ramLine;
             int ramLineCount = 0;
-            while ((ramLine = readerRam.readLine()) != null) {
+            while ((ramLine = bufferedReader.readLine()) != null) {
                 ramLineCount++;
                 if (ramLineCount == 2) {
                     String[] parts = ramLine.trim().split("\\s+");
-                    ramTotal = Long.parseLong(parts[1]) * 1024;
-                    ramUsed  = Long.parseLong(parts[2]) * 1024;
-                    ramFree  = Long.parseLong(parts[3]) * 1024;
+                    homeStats.ramTotal = Long.parseLong(parts[1]) * 1024;
+                    homeStats.ramUsed  = Long.parseLong(parts[2]) * 1024;
+                    homeStats.ramFree  = Long.parseLong(parts[3]) * 1024;
                 }
             }
-            processRam.waitFor();
+            process.waitFor();
 
-            // JVM
-            Runtime runtime = Runtime.getRuntime();
-            long jvmUsed  = runtime.totalMemory() - runtime.freeMemory();
-            long jvmTotal = runtime.maxMemory();
-
-            // Letztes Backup
-            PreparedStatement preparedStatementBackup = connection.prepareStatement(
-                    "SELECT dateTimeCreated FROM backup ORDER BY dateTimeCreated DESC LIMIT 1"
-            );
-            ResultSet resultSetBackup = preparedStatementBackup.executeQuery();
-            String lastBackup = null;
-            if (resultSetBackup.next()) {
-                lastBackup = resultSetBackup.getString("dateTimeCreated");
-            }
-            preparedStatementBackup.close();
-
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("totalDocuments", totalDocuments);
-            result.put("totalSize",      totalSize);
-            result.put("dueSoon",        dueSoon);
-            result.put("diskTotal",      diskTotal);
-            result.put("diskUsed",       diskUsed);
-            result.put("diskFree",       diskFree);
-            result.put("ramTotal",       ramTotal);
-            result.put("ramUsed",        ramUsed);
-            result.put("ramFree",        ramFree);
-            result.put("jvmUsed",        jvmUsed);
-            result.put("jvmTotal",       jvmTotal);
-            result.put("lastBackup",     lastBackup);
-
-            return new ObjectMapper().writer().withDefaultPrettyPrinter().writeValueAsString(result);
-
-        } finally {
-            try { if (preparedStatementStats != null) preparedStatementStats.close(); } catch (Exception e) {}
-            try { if (preparedStatementDue  != null) preparedStatementDue.close();  } catch (Exception e) {}
-            try { if (connection != null) connection.close(); } catch (Exception e) {}
+        } catch (Exception e) {
+            Logger.log(e.getMessage(), Log.LogLevel.ERROR);
         }
     }
+
+    private static void fillJVMINFO(
+            com.panikradius.sdms.models.HomeStats homeStats
+    )
+    {
+        Runtime runtime = Runtime.getRuntime();
+        homeStats.jvmUsed  = runtime.totalMemory() - runtime.freeMemory();
+        homeStats.jvmTotal = runtime.maxMemory();
+    }
+
+    private static void fillLastBackupInfo(
+            Connection connection,
+            com.panikradius.sdms.models.HomeStats homeStats
+    )
+    {
+        try {
+            PreparedStatement prepareStatement = connection.prepareStatement(
+                    "SELECT dateTimeCreated FROM backup ORDER BY dateTimeCreated DESC LIMIT 1"
+            );
+            ResultSet resultSet = prepareStatement.executeQuery();
+            if (resultSet.next()) {
+                homeStats.lastBackup = resultSet.getString("dateTimeCreated");
+            }
+            prepareStatement.close();
+
+        } catch (Exception e) {
+            Logger.log(e.getMessage(), Log.LogLevel.ERROR);
+        }
+    }
+
 }

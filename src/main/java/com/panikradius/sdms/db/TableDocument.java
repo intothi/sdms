@@ -3,8 +3,10 @@ package com.panikradius.sdms.db;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.panikradius.sdms.App;
+import com.panikradius.sdms.Logger;
 import com.panikradius.sdms.models.Document;
 import com.panikradius.sdms.models.DocumentMeta;
+import com.panikradius.sdms.models.Log;
 import com.panikradius.sdms.models.Tag;
 import jakarta.ws.rs.core.Response;
 
@@ -73,10 +75,10 @@ public class TableDocument {
     }
 
     public static void deleteById(Connection connection, int id) throws SQLException {
-        PreparedStatement ps = connection.prepareStatement(
+        PreparedStatement preparedStatement = connection.prepareStatement(
                 "DELETE FROM " + tableConnectionInfo.tableName + " WHERE id = ?");
-        ps.setInt(1, id);
-        ps.executeUpdate();
+        preparedStatement.setInt(1, id);
+        preparedStatement.executeUpdate();
     }
 
     public static int post(Connection connection, Document document) {
@@ -183,10 +185,6 @@ public class TableDocument {
             String sortDir) throws JsonProcessingException {
 
         Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        PreparedStatement countStatement = null;
-        Map<Integer, Document> documentMap = new LinkedHashMap<>();
-        int totalCount = 0;
 
         try {
             connection = DriverManager.getConnection(
@@ -194,76 +192,84 @@ public class TableDocument {
                     tableConnectionInfo.user,
                     tableConnectionInfo.pw);
 
-            // ── WHERE Clause nur auf document-Ebene ──────────────
-            StringBuilder whereClause = new StringBuilder();
-            List<Object> params = new ArrayList<>();
+        } catch (Exception e) {
+            Logger.log(e.getMessage(), Log.LogLevel.ERROR);
+            return "";
+        }
 
-            if (!name.isEmpty()) {
-                whereClause.append(" WHERE (MATCH(ocrText) AGAINST(?) OR LOWER(comment) LIKE LOWER(?)) ");
-                params.add(name);
-                params.add("%" + name + "%");
+        StringBuilder whereClause = new StringBuilder();
+        List<Object> params = new ArrayList<>();
+
+        if (!name.isEmpty()) {
+            whereClause.append(" WHERE (MATCH(ocrText) AGAINST(?) OR LOWER(comment) LIKE LOWER(?)) ");
+            params.add(name);
+            params.add("%" + name + "%");
+        }
+
+        if (tagIds.length > 0) {
+            whereClause.append(whereClause.length() == 0 ? " WHERE " : " AND ");
+            whereClause.append("id IN (SELECT documentID FROM document_tag WHERE tagID IN (");
+            for (int i = 0; i < tagIds.length; i++) {
+                whereClause.append(i == 0 ? "?" : ",?");
+                params.add(tagIds[i]);
             }
+            whereClause.append("))");
+        }
 
-            // Tag-Filter als IN-Subquery auf document_tag
-            if (tagIds.length > 0) {
-                whereClause.append(whereClause.length() == 0 ? " WHERE " : " AND ");
-                whereClause.append("id IN (SELECT documentID FROM document_tag WHERE tagID IN (");
-                for (int i = 0; i < tagIds.length; i++) {
-                    whereClause.append(i == 0 ? "?" : ",?");
-                    params.add(tagIds[i]);
-                }
-                whereClause.append("))");
-            }
+        String countQuery = "SELECT COUNT(*) FROM document" + whereClause;
+        int totalCount = 0;
 
-            StringBuilder sortClause = new StringBuilder();
-            if (!sortBy.isEmpty()) {
-                sortClause.append(" ORDER BY " + sortBy + " " + sortDir);
-            }
-
-            // ── COUNT Query ───────────────────────────────────────
-            String countQuery = "SELECT COUNT(*) FROM document" + whereClause;
-
-            countStatement = connection.prepareStatement(countQuery);
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(countQuery);
             for (int i = 0; i < params.size(); i++) {
-                countStatement.setObject(i + 1, params.get(i));
-            }
-
-            ResultSet countResult = countStatement.executeQuery();
-            if (countResult.next()) {
-                totalCount = countResult.getInt(1);
-            }
-
-
-            List<Object> mainParams = new ArrayList<>(params);
-
-            StringBuilder mainQuery = new StringBuilder();
-            mainQuery.append("SELECT d.id, d.fileName, d.comment, d.dateDocument, d.dueDate, d.dateTimeArchived, d.parentId, d.fileSize, d.countPages, d.done, ");
-            mainQuery.append("t.id AS tagId, t.name AS tagName, c.color AS tagColor ");
-            mainQuery.append("FROM (SELECT * FROM document");
-            mainQuery.append(whereClause);
-            //mainQuery.append(" ORDER BY id ");
-            mainQuery.append(sortClause);
-            mainQuery.append(" ");
-
-            if (top != 0) {
-                mainQuery.append("LIMIT ? OFFSET ?");
-                mainParams.add(top);
-                mainParams.add(skip);
-            }
-
-            mainQuery.append(") d ");
-            mainQuery.append("LEFT JOIN document_tag dt ON dt.documentID = d.id ");
-            mainQuery.append("LEFT JOIN tag t ON t.id = dt.tagID ");
-            mainQuery.append("LEFT JOIN color c ON c.id = t.colorId ");
-            //mainQuery.append("ORDER BY d.id");
-            mainQuery.append(sortClause);
-
-            preparedStatement = connection.prepareStatement(mainQuery.toString());
-            for (int i = 0; i < mainParams.size(); i++) {
-                preparedStatement.setObject(i + 1, mainParams.get(i));
+                preparedStatement.setObject(i + 1, params.get(i));
             }
 
             ResultSet resultSet = preparedStatement.executeQuery();
+            preparedStatement.close();
+
+            if (resultSet.next()) {
+                totalCount = resultSet.getInt(1);
+            }
+
+        } catch (Exception e) { Logger.log(e.getMessage(), Log.LogLevel.ERROR); }
+
+        List<Object> mainParams = new ArrayList<>(params);
+
+        StringBuilder mainQuery = new StringBuilder();
+        mainQuery.append("SELECT d.id, d.fileName, d.comment, d.dateDocument, d.dueDate, d.dateTimeArchived, d.parentId, d.fileSize, d.countPages, d.done, ");
+        mainQuery.append("t.id AS tagId, t.name AS tagName, c.color AS tagColor ");
+        mainQuery.append("FROM (SELECT * FROM document");
+        mainQuery.append(whereClause);
+
+        StringBuilder sortClause = new StringBuilder();
+        if (!sortBy.isEmpty()) {
+            sortClause.append(" ORDER BY " + sortBy + " " + sortDir);
+        }
+
+        mainQuery.append(sortClause);
+        mainQuery.append(" ");
+
+        if (top != 0) {
+            mainQuery.append("LIMIT ? OFFSET ?");
+            mainParams.add(top);
+            mainParams.add(skip);
+        }
+
+        mainQuery.append(") d ");
+        mainQuery.append("LEFT JOIN document_tag dt ON dt.documentID = d.id ");
+        mainQuery.append("LEFT JOIN tag t ON t.id = dt.tagID ");
+        mainQuery.append("LEFT JOIN color c ON c.id = t.colorId ");
+        mainQuery.append(sortClause);
+
+        Map<Integer, Document> documentMap = new LinkedHashMap<>();
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(mainQuery.toString());
+            for (int i = 0; i < mainParams.size(); i++) {
+                preparedStatement.setObject(i + 1, mainParams.get(i));
+            }
+            ResultSet resultSet = preparedStatement.executeQuery();
+            preparedStatement.close();
 
             while (resultSet.next()) {
                 int docId = resultSet.getInt("id");
@@ -299,8 +305,6 @@ public class TableDocument {
         } catch (Exception e) {
 
         } finally {
-            try { if (countStatement != null) countStatement.close(); } catch (Exception e) { }
-            try { if (preparedStatement != null) preparedStatement.close(); } catch (Exception e) { }
             try { if (connection != null) connection.close(); } catch (Exception e) { }
         }
 

@@ -35,7 +35,6 @@ import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.HashSet;
 import java.util.List;
@@ -56,7 +55,7 @@ public class Document {
             @QueryParam("tags") String tags,
             @QueryParam("sortBy") String sortBy,
             @QueryParam("sortDir") String sortDir)
-            throws JsonProcessingException, SQLException {
+            throws JsonProcessingException {
 
         String[] parts = !tags.isEmpty() ? tags.split(",") : new String[0];
 
@@ -72,7 +71,7 @@ public class Document {
     @GET
     @Path("/thread")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getThread(@QueryParam("id") int id) throws JsonProcessingException {
+    public Response getThread(@QueryParam("id") int id) {
         try {
             String result = TableDocument.getThread(id);
             return Response.ok(result).build();
@@ -211,7 +210,7 @@ public class Document {
 
         String fileName;
 
-        //TODO better exception handling, thus move vars to buttom
+        //TODO better exception handling, thus move vars to the bottom
         int documentID = 0;
         double timeEndFilenameAndObjectBuilding = 0;
         double timeEndChecksum = 0;
@@ -221,7 +220,7 @@ public class Document {
             List<String> tagNames = TableTag.getNamesByIds(allTagIdsArray);
             StringBuilder fileNameBuilder = new StringBuilder(dateNameForFile);
             for (int i = 0; i < tagNames.size(); i++) {
-                fileNameBuilder.append("_").append(replaceUmlauts(tagNames.get(i)));
+                fileNameBuilder.append("_").append(replaceUmlautsAndOtherSpecial(tagNames.get(i)));
             }
             fileName = fileNameBuilder + ".pdf";
 
@@ -422,7 +421,7 @@ public class Document {
 
             StringBuilder fileNameBuilder = new StringBuilder(timestamp);
             for (int i = 0; i < tagNames.size(); i++) {
-                fileNameBuilder.append("_").append(replaceUmlauts(tagNames.get(i)));
+                fileNameBuilder.append("_").append(replaceUmlautsAndOtherSpecial(tagNames.get(i)));
             }
             String newFileName = fileNameBuilder + ".pdf";
 
@@ -455,7 +454,7 @@ public class Document {
         }
     }
 
-    private static String replaceUmlauts(String input) {
+    private static String replaceUmlautsAndOtherSpecial(String input) {
         return input
                 .replace("ä", "ae")
                 .replace("ö", "oe")

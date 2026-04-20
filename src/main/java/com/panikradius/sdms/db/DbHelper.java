@@ -144,7 +144,7 @@ public class DbHelper {
 //        Connection connection = null;
 //        Statement statement = null;
 //        //Product product = null;
-//        // TODO(CT) It makes no sense to me, to create an instance of product, in an general helper class
+//        // TODO(CT) It makes no sense, to create an instance of product, in an general helper class have to check this in my old project I keep this for reference
 //
 //        try {
 //            connection = DriverManager.getConnection(

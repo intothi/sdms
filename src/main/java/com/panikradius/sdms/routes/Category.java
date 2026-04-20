@@ -3,7 +3,6 @@ package com.panikradius.sdms.routes;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.panikradius.sdms.Logger;
 import com.panikradius.sdms.db.TableCategory;
-import com.panikradius.sdms.db.TableTag;
 import com.panikradius.sdms.models.Log;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -32,7 +31,7 @@ public class Category {
     @Path("/post")
     @Consumes(MediaType.APPLICATION_JSON)
     public Response post(com.panikradius.sdms.models.Category category) {
-        //TODO TAG validation --> check for double entries
+
         if (TableCategory.isAlreadyExisting(category)) {
             String msg = "could not save category with name: " + category.name + " because it already exists";
             Logger.log(msg, Log.LogLevel.INFO);

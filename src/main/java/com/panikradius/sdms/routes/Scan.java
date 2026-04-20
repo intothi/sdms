@@ -1,7 +1,5 @@
 package com.panikradius.sdms.routes;
 
-import com.panikradius.sdms.Logger;
-import com.panikradius.sdms.models.Log;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -18,7 +16,6 @@ public class Scan {
     @Path("/start")
     public Response start() {
         scanRunning = true;
-        Logger.log("Scan gestartet", Log.LogLevel.INFO);
         return Response.ok().build();
     }
 
@@ -26,7 +23,6 @@ public class Scan {
     @Path("/done")
     public Response done() {
         scanRunning = false;
-        Logger.log("Scan abgeschlossen", Log.LogLevel.INFO);
         return Response.ok().build();
     }
 
