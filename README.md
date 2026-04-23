@@ -17,6 +17,8 @@ The backend runs as a Java/Jersey REST API on port 8080, the frontend is built i
 
 ---
 
+![Screenshot](assets/sdms_home_dark.png) ![Screenshot](assets/sdms_home_bright.png) ![Screenshot](assets/sdms_scanner_config.png) ![Screenshot](assets/sdms_backup.png)  ![Screenshot](assets/sdms_logs.png)
+
 ## Features
 
 - **OCR** — Text extraction via Tesseract (German + English); called from a custom scan script
